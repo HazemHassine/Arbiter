@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Local Ops — Development Environment</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='5' y='5' width='54' height='54' rx='13' fill='%230e1820' stroke='%2347e6df'/%3E%3Cpath d='M20 23h25M20 32h16M20 41h21' stroke='%2347e6df' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/ui/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#overview" aria-label="Local Ops home">
+        <span class="brand-mark"><i></i><i></i><i></i></span>
+        <span><strong>LOCAL OPS</strong><small>DEV ENVIRONMENT</small></span>
+      </a>
+
+      <nav class="nav" aria-label="Control panel">
+        <p class="nav-label">Workspace</p>
+        <a href="#overview" data-view="overview" class="active"><span class="nav-icon">⌁</span>Overview</a>
+        <a href="#agent" data-view="agent"><span class="nav-icon">✦</span>Ask Agent</a>
+        <a href="#ports" data-view="ports"><span class="nav-icon">⇄</span>Ports <b id="nav-port-count">—</b></a>
+        <a href="#projects" data-view="projects"><span class="nav-icon">◇</span>Projects <b id="nav-project-count">—</b></a>
+        <p class="nav-label">Runtime</p>
+        <a href="#containers" data-view="containers"><span class="nav-icon">▣</span>Containers <b id="nav-container-count">—</b></a>
+        <a href="#docker" data-view="docker"><span class="nav-icon">◫</span>Docker</a>
+        <p class="nav-label">Safety</p>
+        <a href="#approvals" data-view="approvals"><span class="nav-icon">✓</span>Approvals <b id="nav-approval-count">—</b></a>
+        <a href="#history" data-view="history"><span class="nav-icon">↺</span>Action History</a>
+      </nav>
+
+      <div class="sidebar-foot">
+        <div class="daemon-state"><span class="pulse"></span><div><strong id="daemon-label">Checking agent</strong><small id="daemon-detail">127.0.0.1</small></div></div>
+        <a href="/docs" target="_blank" class="docs-link">API documentation <span>↗</span></a>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button class="mobile-menu" id="mobile-menu" aria-label="Open navigation">☰</button>
+        <div>
+          <p class="eyebrow" id="page-eyebrow">SYSTEM OVERVIEW</p>
+          <h1 id="page-title">Development environment</h1>
+        </div>
+        <div class="top-actions">
+          <span class="last-sync" id="last-sync">Not synced</span>
+          <button class="icon-button" id="refresh-all" title="Refresh current view">↻</button>
+          <button class="button primary" data-open-agent><span>✦</span> Ask agent</button>
+        </div>
+      </header>
+
+      <div class="content">
+        <section class="view active" id="view-overview" data-title="Development environment" data-eyebrow="SYSTEM OVERVIEW">
+          <div class="hero">
+            <div>
+              <span class="status-chip"><i></i> LOCAL AGENT ONLINE</span>
+              <h2>Everything running.<br><em>Nothing colliding.</em></h2>
+              <p>One operational view across local processes, Compose projects, ports, and containers.</p>
+            </div>
+            <div class="hero-orbit" aria-hidden="true"><i></i><i></i><i></i><span>OPS</span></div>
+          </div>
+
+          <div class="metric-grid">
+            <article class="metric"><span class="metric-icon cyan">⇄</span><div><small>LISTENING PORTS</small><strong id="metric-ports">—</strong><p id="metric-port-note">Scanning host</p></div></article>
+            <article class="metric"><span class="metric-icon violet">◇</span><div><small>KNOWN PROJECTS</small><strong id="metric-projects">—</strong><p id="metric-project-note">Reading registry</p></div></article>
+            <article class="metric"><span class="metric-icon green">▣</span><div><small>CONTAINERS RUNNING</small><strong id="metric-containers">—</strong><p id="metric-container-note">Checking Docker</p></div></article>
+            <article class="metric"><span class="metric-icon amber">!</span><div><small>PENDING APPROVALS</small><strong id="metric-approvals">—</strong><p id="metric-approval-note">Checking queue</p></div></article>
+          </div>
+
+          <div class="dashboard-grid">
+            <article class="panel span-2">
+              <header class="panel-head"><div><p class="eyebrow">LIVE STATE</p><h3>Port activity</h3></div><button class="text-button" data-go="ports">View all →</button></header>
+              <div class="mini-port-map" id="overview-ports"><div class="skeleton rows"></div></div>
+            </article>
+            <article class="panel">
+              <header class="panel-head"><div><p class="eyebrow">HOST</p><h3>Resources</h3></div></header>
+              <div id="resource-gauges" class="resource-gauges"><div class="skeleton block"></div></div>
+            </article>
+            <article class="panel span-2">
+              <header class="panel-head"><div><p class="eyebrow">REGISTERED</p><h3>Projects</h3></div><button class="text-button" data-go="projects">Manage →</button></header>
+              <div id="overview-projects" class="compact-list"><div class="empty-inline">No projects registered yet.</div></div>
+            </article>
+            <article class="panel accent-panel">
+              <p class="eyebrow">QUICK OPERATION</p><h3>Prepare a project</h3>
+              <p>Inspect configuration, detect port conflicts, and propose the minimal safe changes.</p>
+              <select id="quick-project" aria-label="Project to prepare"><option value="">Select project…</option></select>
+              <button class="button primary wide" id="quick-prepare">Inspect & prepare</button>
+            </article>
+          </div>
+        </section>
+
+        <section class="view" id="view-agent" data-title="Ask the environment agent" data-eyebrow="OPERATIONAL ASSISTANT">
+          <div class="agent-layout">
+            <article class="agent-console">
+              <div class="agent-intro" id="agent-intro"><span class="agent-glyph">✦</span><h2>What do you need to know?</h2><p>I inspect real local state before answering. Changes always pass through the approval queue.</p></div>
+              <div class="conversation" id="conversation"></div>
+              <form class="agent-composer" id="agent-form">
+                <textarea id="agent-input" rows="2" placeholder="Ask what owns a port, find conflicts, or prepare a project…" required></textarea>
+                <button class="send-button" type="submit" aria-label="Send">↑</button>
+              </form>
+            </article>
+            <aside class="prompt-rail">
+              <p class="eyebrow">TRY ASKING</p>
+              <button class="suggestion">What ports are currently used?</button>
+              <button class="suggestion">Which projects have port conflicts?</button>
+              <button class="suggestion">What is using port 5432?</button>
+              <div class="safety-note"><span>✓</span><div><strong>Approval protected</strong><p>The agent cannot execute medium or higher-risk changes without your explicit approval.</p></div></div>
+            </aside>
+          </div>
+        </section>
+
+        <section class="view" id="view-ports" data-title="Port coordination" data-eyebrow="HOST NETWORK">
+          <div class="toolbar">
+            <div class="search"><span>⌕</span><input id="port-search" placeholder="Filter by port, process, container, or project"></div>
+            <button class="button secondary" id="find-free-button">Find free ports</button>
+            <button class="button secondary" data-refresh="ports">↻ Refresh</button>
+          </div>
+          <div class="split-cards">
+            <article class="panel"><p class="eyebrow">COORDINATION</p><h3>Conflict status</h3><div id="conflict-summary" class="big-status"><span class="spinner"></span> Checking claims</div></article>
+            <article class="panel"><p class="eyebrow">ALLOCATION</p><h3>Free-port finder</h3><div class="inline-form"><input id="range-start" type="number" value="3000" min="1" max="65535"><span>to</span><input id="range-end" type="number" value="4000" min="1" max="65535"><input id="range-count" type="number" value="5" min="1" max="100"><button class="button primary" id="run-free-search">Find</button></div><div class="port-pills" id="free-results"></div></article>
+          </div>
+          <article class="panel table-panel"><div class="table-wrap"><table><thead><tr><th>Port</th><th>Protocol</th><th>Owner</th><th>Project / service</th><th>Source</th><th>Status</th></tr></thead><tbody id="ports-table"></tbody></table></div></article>
+        </section>
+
+        <section class="view" id="view-projects" data-title="Projects" data-eyebrow="PROJECT REGISTRY">
+          <div class="toolbar">
+            <form class="register-form" id="register-form"><input id="project-path" placeholder="/home/user/dev/my-project" required><button class="button primary" type="submit">+ Register project</button></form>
+            <button class="button secondary" id="scan-projects">Scan configured roots</button>
+            <button class="button secondary" data-refresh="projects">↻ Refresh</button>
+          </div>
+          <div class="card-grid" id="projects-grid"></div>
+        </section>
+
+        <section class="view" id="view-containers" data-title="Containers" data-eyebrow="DOCKER RUNTIME">
+          <div class="toolbar"><div class="search"><span>⌕</span><input id="container-search" placeholder="Filter containers"></div><button class="button secondary" data-refresh="containers">↻ Refresh</button></div>
+          <article class="panel table-panel"><div class="table-wrap"><table><thead><tr><th>Container</th><th>Image</th><th>State</th><th>Health</th><th>Published ports</th><th>Compose</th><th></th></tr></thead><tbody id="containers-table"></tbody></table></div></article>
+        </section>
+
+        <section class="view" id="view-docker" data-title="Docker resources" data-eyebrow="RUNTIME STORAGE">
+          <div class="docker-tabs"><button class="active" data-docker-tab="disk">Disk usage</button><button data-docker-tab="images">Images</button><button data-docker-tab="volumes">Volumes</button><button data-docker-tab="networks">Networks</button></div>
+          <div id="docker-content"><div class="skeleton block"></div></div>
+        </section>
+
+        <section class="view" id="view-approvals" data-title="Approvals" data-eyebrow="SAFETY GATE">
+          <div class="section-intro"><div><h2>Human decisions, exact actions.</h2><p>Approval executes the stored action and arguments exactly as proposed.</p></div><button class="button secondary" data-refresh="approvals">↻ Refresh</button></div>
+          <div class="approval-list" id="approval-list"></div>
+        </section>
+
+        <section class="view" id="view-history" data-title="Action history" data-eyebrow="AUDIT LOG">
+          <div class="toolbar"><div class="filter-group"><button class="filter active" data-history-filter="all">All</button><button class="filter" data-history-filter="completed">Completed</button><button class="filter" data-history-filter="failed">Failed</button></div><button class="button secondary" data-refresh="history">↻ Refresh</button></div>
+          <article class="panel table-panel"><div class="table-wrap"><table><thead><tr><th>Action</th><th>Risk</th><th>Status</th><th>Verification</th><th>Request</th></tr></thead><tbody id="history-table"></tbody></table></div></article>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <dialog id="detail-dialog"><div class="dialog-head"><div><p class="eyebrow" id="dialog-eyebrow">DETAILS</p><h2 id="dialog-title">Details</h2></div><button class="icon-button" data-close-dialog>×</button></div><div id="dialog-content" class="dialog-content"></div></dialog>
+  <div class="toast-stack" id="toasts" aria-live="polite"></div>
+  <script src="/ui/app.js" defer></script>
+</body>
+</html>
