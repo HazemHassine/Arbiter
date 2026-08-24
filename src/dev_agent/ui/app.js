@@ -57,7 +57,7 @@ function showDialog(title, eyebrow, content, raw = false) {
 }
 
 function setSynced() {
-  $("#last-sync").textContent = `SYNCED ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+  $("#last-sync").textContent = `Updated ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
 }
 
 async function safeLoad(fn, fallback = []) {
@@ -162,7 +162,7 @@ function renderPorts() {
     <td class="mono">${esc(item.protocol.toUpperCase())}</td>
     <td><span class="cell-main">${esc(item.container || item.process || "Unknown")}</span><span class="cell-sub">${item.pid ? `PID ${esc(item.pid)}` : esc(shortId(item.container_id))}</span></td>
     <td><span class="cell-main">${esc(item.project || "—")}</span><span class="cell-sub">${esc(item.service || "unassigned")}</span></td>
-    <td class="muted">${esc(item.source ? item.source.split("/").pop() : "runtime")}</td><td>${badge(item.state)}</td><td><button class="mini-button" data-inspect-type="port" data-inspect-id="${esc(`${item.protocol}:${item.port}`)}">Trace</button></td></tr>`).join("")
+    <td class="muted">${esc(item.source ? item.source.split("/").pop() : "runtime")}</td><td>${badge(item.state)}</td><td><div class="table-actions"><button class="mini-button" data-inspect-type="port" data-inspect-id="${esc(`${item.protocol}:${item.port}`)}">Inspect</button>${item.protocol === "tcp" ? `<button class="mini-button" data-preview-port="${esc(item.port)}">Preview</button>` : ""}</div></td></tr>`).join("")
     : '<tr><td colspan="7"><div class="empty-state">No ports match this filter.</div></td></tr>';
 }
 
@@ -230,11 +230,11 @@ function renderContainers() {
   const filter = $("#container-search").value.trim().toLowerCase();
   const items = state.containers.filter(item => JSON.stringify(item).toLowerCase().includes(filter));
   $("#containers-table").innerHTML = items.length ? items.map(item => `
-    <tr><td><span class="cell-main">${esc(item.name)}</span><span class="cell-sub">${esc(shortId(item.id))}</span></td>
+    <tr data-inspect-type="container" data-inspect-id="${esc(item.id)}"><td><span class="cell-main">${esc(item.name)}</span><span class="cell-sub">${esc(shortId(item.id))}</span></td>
     <td class="mono">${esc(item.image)}</td><td>${badge(item.state)}</td><td>${badge(item.health || "none")}</td>
     <td class="mono">${esc(item.ports.map(p => `${p.host_port}→${p.container_port}`).join(", ") || "—")}</td>
     <td><span class="cell-main">${esc(item.compose_project || "—")}</span><span class="cell-sub">${esc(item.compose_service || "standalone")}</span></td>
-    <td><div class="table-actions"><button class="mini-button" data-container-action="logs" data-id="${esc(item.id)}">Logs</button><button class="mini-button" data-container-action="restart" data-id="${esc(item.id)}">Restart</button><button class="mini-button" data-container-action="more" data-id="${esc(item.id)}">•••</button></div></td></tr>`).join("")
+    <td><div class="table-actions"><button class="mini-button" data-observe-container="${esc(item.id)}">Logs</button>${item.ports?.length ? `<button class="mini-button" data-preview-port="${esc(item.ports[0].host_port)}">Preview</button>` : ""}<button class="mini-button" data-container-action="restart" data-id="${esc(item.id)}">Restart</button><button class="mini-button" data-container-action="more" data-id="${esc(item.id)}">•••</button></div></td></tr>`).join("")
     : '<tr><td colspan="7"><div class="empty-state">No containers match this filter.</div></td></tr>';
 }
 

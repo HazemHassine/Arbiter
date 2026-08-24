@@ -16,11 +16,13 @@ curl http://127.0.0.1:8765/api/v1/ports
 ```
 
 Open [http://127.0.0.1:8765](http://127.0.0.1:8765) for the control panel. It
-includes a connected topology graph, workspace screens, process tree evidence,
-live activity, Docker resources, a command palette, port tracing, and an
-approval-protected project file editor. It is bundled locally with no frontend
-build step or external runtime assets, and uses the same REST safety pipeline as
-the CLI.
+uses a deployment-dashboard-style interface with a global live-resource picker,
+connected topology, workspace screens, process evidence, and an observability
+console for SSE events, auto-refreshing container logs and metrics, and embedded
+localhost previews. Docker resources, command search, port tracing, and the
+approval-protected project file editor remain available in the same shell. The UI
+is bundled locally with no frontend build step or external runtime assets, and
+uses the same REST safety pipeline as the CLI.
 
 ## What it observes
 
@@ -31,6 +33,10 @@ the CLI.
   before a project can be edited.
 - Docker event streaming plus configurable host polling drive the SSE activity
   feed at `/api/v1/events/stream`.
+- The observability workspace can tail a selected container, filter or pause
+  output, inspect a runtime metrics snapshot, and render likely HTTP listeners in
+  an embedded preview with a new-tab fallback. Logs and metrics remain on demand
+  and are never persisted by the control plane.
 - Dockerfile and Makefile inspection provide deterministic metadata and
   conservative diagnostics; the LLM layer only sits above typed read-only tools.
 

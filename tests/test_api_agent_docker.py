@@ -14,7 +14,10 @@ def test_health_port_project_and_docker_apis(service_factory, tmp_path):
         assert client.get("/", follow_redirects=False).headers["location"] == "/ui/"
         ui = client.get("/ui/")
         assert ui.status_code == 200
-        assert "Local Ops" in ui.text
+        assert "Localhost — Developer Control Plane" in ui.text
+        assert 'id="resource-selector"' in ui.text
+        assert 'id="container-log-output"' in ui.text
+        assert 'id="preview-frame"' in ui.text
         assert client.get("/api/v1/ports/5432").json()["process"] == "postgres"
         project = tmp_path / "api-demo"
         project.mkdir()
