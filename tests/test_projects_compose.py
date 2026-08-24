@@ -32,6 +32,27 @@ def test_project_discovery_is_bounded(tmp_path):
     assert [item.name for item in found] == ["known"]
 
 
+def test_project_discovery_descends_through_grouping_folders(tmp_path):
+    project = tmp_path / "category" / "team" / "service"
+    project.mkdir(parents=True)
+    (project / "pyproject.toml").write_text("[project]\nname='service'\nversion='1'\n")
+
+    assert [item.path for item in discover_projects([tmp_path], max_depth=3)] == [project]
+    assert discover_projects([tmp_path], max_depth=2) == []
+
+
+def test_project_discovery_ignores_dependencies_and_symlinks(tmp_path):
+    dependency = tmp_path / "category" / "node_modules" / "dependency"
+    dependency.mkdir(parents=True)
+    (dependency / "package.json").write_text('{"name":"dependency"}')
+    external = tmp_path / "external"
+    external.mkdir()
+    (external / "package.json").write_text('{"name":"external"}')
+    (tmp_path / "category" / "linked").symlink_to(external, target_is_directory=True)
+
+    assert discover_projects([tmp_path / "category"], max_depth=4) == []
+
+
 def test_project_registry_refresh(service_factory, tmp_path):
     project = tmp_path / "demo"
     project.mkdir()

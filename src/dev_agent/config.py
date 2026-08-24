@@ -17,7 +17,9 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_model: str = ""
     llm_reasoning_effort: str | None = "none"
+    filter_llm_model: str = "gpt-5.4-nano"
     agent_max_steps: int = 12
+    project_scan_depth: int = Field(default=4, ge=1, le=8)
     auto_approve_read_only: bool = True
     auto_approve_low_risk: bool = False
     default_port_search_range_start: int = 3000

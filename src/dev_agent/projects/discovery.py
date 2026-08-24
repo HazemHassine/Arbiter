@@ -1,4 +1,5 @@
 import os
+from collections import deque
 from pathlib import Path
 
 from dev_agent.compose.parser import inspect_compose
@@ -7,6 +8,24 @@ from dev_agent.security import safe_project_path
 
 COMPOSE_NAMES = ("compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml")
 PROJECT_MARKERS = (*COMPOSE_NAMES, "Makefile", "Dockerfile", "pyproject.toml", "package.json", ".git")
+IGNORED_DISCOVERY_DIRECTORIES = {
+    ".cache",
+    ".dev-agent",
+    ".git",
+    ".idea",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pycache__",
+    "build",
+    "dist",
+    "node_modules",
+    "target",
+    "vendor",
+}
 
 
 def find_project_root(path: Path, max_parents: int = 6) -> Path | None:
@@ -68,21 +87,51 @@ def inspect_project(path: Path, roots: list[Path] | None = None) -> Project:
     )
 
 
-def discover_projects(roots: list[Path]) -> list[Project]:
+def discover_projects(roots: list[Path], max_depth: int = 4) -> list[Project]:
+    """Discover project roots below configured folders with a strict depth bound.
+
+    Discovery stops descending as soon as a project marker is found. This keeps
+    monorepos as one project when their root is marked and avoids accidentally
+    indexing generated dependency trees.
+    """
     projects: list[Project] = []
     seen: set[Path] = set()
     for configured_root in roots:
         root = configured_root.expanduser().resolve(strict=False)
         if not root.is_dir():
             continue
-        candidates = [root, *(item for item in root.iterdir() if item.is_dir() and not item.name.startswith("."))]
-        for candidate in candidates:
-            resolved = candidate.resolve()
-            if resolved in seen or not any((resolved / marker).exists() for marker in PROJECT_MARKERS):
-                continue
-            seen.add(resolved)
+        candidates: deque[tuple[Path, int]] = deque([(root, 0)])
+        while candidates:
+            candidate, depth = candidates.popleft()
             try:
-                projects.append(inspect_project(resolved, roots))
-            except (OSError, ValueError):
+                resolved = candidate.resolve(strict=True)
+            except OSError:
                 continue
-    return projects
+            if resolved in seen:
+                continue
+            has_marker = any((resolved / marker).exists() for marker in PROJECT_MARKERS)
+            if has_marker:
+                seen.add(resolved)
+                try:
+                    projects.append(inspect_project(resolved, roots))
+                except (OSError, ValueError):
+                    continue
+                continue
+            if depth >= max_depth:
+                continue
+            try:
+                children = sorted(
+                    (
+                        item
+                        for item in resolved.iterdir()
+                        if item.is_dir()
+                        and not item.is_symlink()
+                        and item.name not in IGNORED_DISCOVERY_DIRECTORIES
+                        and not item.name.startswith(".")
+                    ),
+                    key=lambda item: item.name.casefold(),
+                )
+            except OSError:
+                continue
+            candidates.extend((child, depth + 1) for child in children)
+    return sorted(projects, key=lambda project: str(project.path).casefold())

@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
-  <meta name="theme-color" content="#000000">
+  <meta name="theme-color" content="#0b1018">
   <title>Localhost — Developer Control Plane</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23000'/%3E%3Cpath d='M13 46 32 12l19 34H13Z' fill='%23fff'/%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%230b1018'/%3E%3Ccircle cx='32' cy='32' r='7' fill='%237aa2ff'/%3E%3Cellipse cx='32' cy='32' rx='23' ry='10' fill='none' stroke='%2364d2bd' stroke-width='4' transform='rotate(40 32 32)'/%3E%3Cellipse cx='32' cy='32' rx='23' ry='10' fill='none' stroke='%237aa2ff' stroke-width='4' transform='rotate(-40 32 32)'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="/ui/styles.css">
 </head>
 <body>
@@ -14,16 +14,16 @@
     <aside class="sidebar">
       <div class="sidebar-top">
         <a class="brand" href="#overview" aria-label="Localhost home">
-          <span class="brand-mark" aria-hidden="true"></span>
+          <span class="brand-mark" data-lucide="orbit" aria-hidden="true"></span>
           <span class="brand-copy"><strong>localhost</strong><small>control plane</small></span>
         </a>
-        <button class="sidebar-collapse" type="button" aria-label="Collapse navigation">‹</button>
+        <button class="sidebar-collapse" type="button" aria-label="Collapse navigation"><span data-lucide="panelClose"></span></button>
       </div>
 
       <button class="workspace-switcher" id="resource-selector" type="button">
-        <span class="workspace-avatar">L</span>
+        <span class="workspace-avatar" data-lucide="scanSearch"></span>
         <span><small>Inspecting</small><strong id="selected-resource-label">All resources</strong></span>
-        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m5 6 3 3 3-3"/></svg>
+        <span data-lucide="chevronDown" aria-hidden="true"></span>
       </button>
 
       <nav class="nav" aria-label="Control plane">
@@ -47,6 +47,7 @@
         <p class="nav-label">Safety</p>
         <a href="#approvals" data-view="approvals"><span class="nav-icon" data-icon="check"></span><span>Approvals</span><b id="nav-approval-count">—</b></a>
         <a href="#history" data-view="history"><span class="nav-icon" data-icon="history"></span><span>Audit log</span></a>
+        <a href="#admin" data-view="admin"><span class="nav-icon" data-icon="admin"></span><span>Admin</span></a>
         <a href="#settings" data-view="settings"><span class="nav-icon" data-icon="settings"></span><span>Settings</span></a>
       </nav>
 
@@ -56,13 +57,13 @@
           <div><strong id="daemon-label">Connecting</strong><small id="daemon-detail">127.0.0.1</small></div>
           <span class="shortcut-dot">•••</span>
         </div>
-        <a href="/docs" target="_blank" class="docs-link">API reference <span>↗</span></a>
+        <a href="/docs" target="_blank" class="docs-link">API reference <span data-lucide="externalLink"></span></a>
       </div>
     </aside>
 
     <main class="main">
       <header class="topbar">
-        <button class="mobile-menu" id="mobile-menu" aria-label="Open navigation">☰</button>
+        <button class="mobile-menu" id="mobile-menu" aria-label="Open navigation"><span data-lucide="menu"></span></button>
         <div class="breadcrumbs">
           <span>Local environment</span><i>/</i><strong id="page-title">Overview</strong>
           <span class="sr-only" id="page-eyebrow">SYSTEM OVERVIEW</span>
@@ -71,8 +72,8 @@
           <span class="sync-state" id="last-sync">Not synced</span>
           <span class="live-pill" id="stream-indicator"><i></i> Live</span>
           <button class="command-button" id="open-palette" title="Search resources and actions (Ctrl+K)"><span>Search resources…</span><kbd>⌘ K</kbd></button>
-          <button class="icon-button" id="refresh-all" title="Refresh current view" aria-label="Refresh current view">↻</button>
-          <button class="button primary" data-open-agent><span class="button-spark">✦</span> Ask AI</button>
+          <button class="icon-button" id="refresh-all" title="Refresh current view" aria-label="Refresh current view"><span data-lucide="refresh"></span></button>
+          <button class="button primary" data-open-agent><span data-lucide="sparkles"></span> Ask AI</button>
         </div>
       </header>
 
@@ -85,7 +86,7 @@
 
           <article class="deployment-card">
             <div class="deployment-main">
-              <div class="deployment-icon"><span></span></div>
+              <div class="deployment-icon"><span data-lucide="orbit"></span></div>
               <div><div class="deployment-title"><h2>Local control plane</h2><span class="status-badge ready"><i></i>Ready</span></div><p>Continuously correlating host processes, Docker, Compose, ports, and project configuration.</p></div>
             </div>
             <div class="deployment-meta">
@@ -125,7 +126,7 @@
               <div id="overview-projects" class="compact-list"><div class="empty-inline">No projects registered yet.</div></div>
             </article>
             <article class="panel quick-operation">
-              <div class="quick-icon">⌁</div><h3>Prepare a workspace</h3><p>Inspect configuration and propose safe fixes for runtime conflicts.</p>
+              <div class="quick-icon" data-lucide="wrench"></div><h3>Prepare a workspace</h3><p>Inspect configuration and propose safe fixes for runtime conflicts.</p>
               <select id="quick-project" aria-label="Project to prepare"><option value="">Select workspace…</option></select>
               <button class="button primary wide" id="quick-prepare">Inspect & prepare</button>
             </article>
@@ -140,14 +141,16 @@
         </section>
 
         <section class="view" id="view-topology" data-title="Topology" data-eyebrow="CONNECTED LOCAL RESOURCES">
-          <header class="page-heading"><div><h1>Resource topology</h1><p>Trace relationships from project configuration to the processes and containers actually running.</p></div><div class="heading-actions"><button class="button secondary" data-refresh="topology">↻ Refresh graph</button></div></header>
+          <header class="page-heading"><div><h1>Resource topology</h1><p>Trace, rearrange, and focus relationships from project configuration to the processes and containers actually running.</p></div><div class="heading-actions"><span class="query-state" id="topology-query-state"><span data-lucide="search"></span> Local text filter</span><button class="button secondary" data-refresh="topology"><span data-lucide="refresh"></span> Refresh graph</button></div></header>
           <div class="toolbar topology-toolbar">
-            <div class="search"><span></span><input id="topology-search" placeholder="Filter graph resources"></div>
+            <div class="search"><span></span><input id="topology-search" placeholder="Try ‘running containers on port 5173’" autocomplete="off"></div>
+            <button class="button intelligence-button" id="topology-smart-filter" title="Interpret this query as a strict structured filter"><span data-lucide="brain"></span> Interpret</button>
             <select id="topology-project" aria-label="Topology scope"><option value="">All observed resources</option></select>
-            <div class="zoom-group"><button class="mini-button" data-topology-zoom="out">−</button><button class="mini-button" data-topology-zoom="reset">Reset</button><button class="mini-button" data-topology-zoom="in">＋</button></div>
+            <div class="zoom-group"><button class="mini-button icon-only" data-topology-zoom="out" title="Zoom out"><span data-lucide="zoomOut"></span></button><span id="topology-zoom-level">100%</span><button class="mini-button icon-only" data-topology-zoom="in" title="Zoom in"><span data-lucide="zoomIn"></span></button><button class="mini-button" data-topology-zoom="fit"><span data-lucide="maximize"></span> Fit</button></div>
+            <button class="mini-button" id="topology-layout-toggle"><span data-lucide="waypoints"></span><span id="topology-layout-label">Flow</span></button>
           </div>
           <div class="topology-layout">
-            <article class="panel topology-panel"><div class="topology-legend" id="topology-legend"></div><div class="topology-stage" id="topology-stage"><svg id="topology-graph" viewBox="0 0 1200 720" role="img" aria-label="Development resource topology"></svg></div></article>
+            <article class="panel topology-panel"><div class="topology-legend" id="topology-legend"></div><div class="topology-stage" id="topology-stage"><div class="graph-hud"><span><b>Wheel</b> zoom</span><span><b>Drag</b> pan / move</span><span><b>Double-click</b> inspect</span></div><svg id="topology-graph" viewBox="0 0 1200 720" role="img" aria-label="Interactive development resource topology"></svg></div></article>
             <article class="panel topology-summary" id="topology-summary"><div class="empty-inline">Load the graph to inspect connected resources.</div></article>
           </div>
         </section>
@@ -155,10 +158,10 @@
         <section class="view" id="view-activity" data-title="Observability" data-eyebrow="LIVE RUNTIME OBSERVATION">
           <header class="page-heading"><div><h1>Observability</h1><p>One live console for system events, container logs, runtime metrics, and local previews.</p></div><div class="heading-actions"><span class="live-pill large"><i></i><span id="observe-status-text">Connecting to stream</span></span><button class="button secondary" data-refresh="activity">↻ Refresh</button></div></header>
           <div class="observe-metrics">
-            <article><span class="observe-icon green">↗</span><div><small>Events buffered</small><strong id="observe-events-count">—</strong></div></article>
-            <article><span class="observe-icon blue">□</span><div><small>Containers running</small><strong id="observe-running-count">—</strong></div></article>
-            <article><span class="observe-icon purple">⌁</span><div><small>Active listeners</small><strong id="observe-listeners-count">—</strong></div></article>
-            <article><span class="observe-icon amber">◷</span><div><small>Observation interval</small><strong id="observe-interval">—</strong></div></article>
+            <article><span class="observe-icon green" data-lucide="activity"></span><div><small>Events buffered</small><strong id="observe-events-count">—</strong></div></article>
+            <article><span class="observe-icon blue" data-lucide="container"></span><div><small>Containers running</small><strong id="observe-running-count">—</strong></div></article>
+            <article><span class="observe-icon purple" data-lucide="route"></span><div><small>Active listeners</small><strong id="observe-listeners-count">—</strong></div></article>
+            <article><span class="observe-icon amber" data-lucide="clock"></span><div><small>Observation interval</small><strong id="observe-interval">—</strong></div></article>
           </div>
           <div class="observability-layout">
             <article class="panel console-panel">
@@ -176,9 +179,9 @@
             </article>
             <aside class="observe-side">
               <article class="panel preview-panel">
-                <header class="preview-toolbar"><div class="browser-dots"><i></i><i></i><i></i></div><div class="preview-address"><span>⌕</span><strong id="preview-url">Select a local endpoint</strong></div><button class="mini-button" id="preview-refresh" title="Reload preview">↻</button><button class="mini-button" id="preview-open" title="Open in a new tab">↗</button></header>
+                <header class="preview-toolbar"><div class="browser-dots"><i></i><i></i><i></i></div><div class="preview-address"><span data-lucide="search"></span><strong id="preview-url">Select a local endpoint</strong></div><button class="mini-button icon-only" id="preview-refresh" title="Reload preview"><span data-lucide="refresh"></span></button><button class="mini-button icon-only" id="preview-open" title="Open in a new tab"><span data-lucide="externalLink"></span></button></header>
                 <div class="preview-select-row"><select id="preview-endpoint" aria-label="Preview endpoint"><option value="">Select detected endpoint…</option></select></div>
-                <div class="preview-frame-wrap"><div class="preview-empty" id="preview-empty"><span class="preview-glyph">△</span><h3>Local preview</h3><p>Select an HTTP port to render the app here. Services that block embedding can still be opened in a new tab.</p></div><iframe id="preview-frame" title="Local application preview" loading="lazy"></iframe></div>
+                <div class="preview-frame-wrap"><div class="preview-empty" id="preview-empty"><span class="preview-glyph" data-lucide="orbit"></span><h3>Local preview</h3><p>Select an HTTP port to render the app here. Services that block embedding can still be opened in a new tab.</p></div><iframe id="preview-frame" title="Local application preview" loading="lazy"></iframe></div>
               </article>
               <article class="panel runtime-detail"><header class="panel-head"><div><h3>Runtime metrics</h3><p>Selected container snapshot</p></div><span class="status-badge muted" id="metrics-status">No selection</span></header><div id="container-metrics" class="metric-list"><div class="empty-inline">Choose a container in the logs console.</div></div></article>
             </aside>
@@ -219,21 +222,57 @@
 
         <section class="view" id="view-agent" data-title="Ask agent" data-eyebrow="OPERATIONAL ASSISTANT">
           <header class="page-heading"><div><h1>Environment agent</h1><p>Ask questions against real local state. Mutations always pass through the approval queue.</p></div></header>
-          <div class="agent-layout"><article class="agent-console"><div class="agent-intro" id="agent-intro"><span class="agent-glyph">✦</span><h2>What do you need to know?</h2><p>I inspect live processes, ports, containers, and configuration before answering.</p></div><div class="conversation" id="conversation"></div><form class="agent-composer" id="agent-form"><textarea id="agent-input" rows="2" placeholder="Ask what owns a port, find conflicts, or prepare a workspace…" required></textarea><button class="send-button" type="submit" aria-label="Send">↑</button></form></article><aside class="prompt-rail"><p class="eyebrow">SUGGESTED</p><button class="suggestion">What changed in my environment recently?</button><button class="suggestion">Which projects have port conflicts?</button><button class="suggestion">What is using port 5432?</button><div class="safety-note"><span>✓</span><div><strong>Approval protected</strong><p>Medium and higher-risk changes require your explicit decision.</p></div></div></aside></div>
+          <div class="agent-layout"><article class="agent-console"><div class="agent-intro" id="agent-intro"><span class="agent-glyph" data-lucide="sparkles"></span><h2>What do you need to know?</h2><p>I inspect live processes, ports, containers, and configuration before answering.</p></div><div class="conversation" id="conversation"></div><form class="agent-composer" id="agent-form"><textarea id="agent-input" rows="2" placeholder="Ask what owns a port, find conflicts, or prepare a workspace…" required></textarea><button class="send-button" type="submit" aria-label="Send"><span data-lucide="send"></span></button></form></article><aside class="prompt-rail"><p class="eyebrow">SUGGESTED</p><button class="suggestion">What changed in my environment recently?</button><button class="suggestion">Which projects have port conflicts?</button><button class="suggestion">What is using port 5432?</button><div class="safety-note"><span data-lucide="shieldCheck"></span><div><strong>Approval protected</strong><p>Medium and higher-risk changes require your explicit decision.</p></div></div></aside></div>
         </section>
 
         <section class="view" id="view-approvals" data-title="Approvals" data-eyebrow="SAFETY GATE"><header class="page-heading"><div><h1>Approvals</h1><p>Review the exact operation and arguments before anything changes.</p></div><button class="button secondary" data-refresh="approvals">↻ Refresh</button></header><div class="approval-list" id="approval-list"></div></section>
         <section class="view" id="view-history" data-title="Audit log" data-eyebrow="ACTION HISTORY"><header class="page-heading"><div><h1>Audit log</h1><p>Every proposed operation, decision, execution result, and verification outcome.</p></div><button class="button secondary" data-refresh="history">↻ Refresh</button></header><div class="toolbar"><div class="filter-group"><button class="filter active" data-history-filter="all">All</button><button class="filter" data-history-filter="completed">Completed</button><button class="filter" data-history-filter="failed">Failed</button></div></div><article class="panel table-panel"><div class="table-wrap"><table><thead><tr><th>Action</th><th>Risk</th><th>Status</th><th>Verification</th><th>Request</th></tr></thead><tbody id="history-table"></tbody></table></div></article></section>
+        <section class="view" id="view-admin" data-title="Admin" data-eyebrow="CONTROL PLANE INTERNALS">
+          <header class="page-heading"><div><h1>Agent administration</h1><p>Process health, API and model usage, event delivery, persistence, safety harness, and operational documentation.</p></div><div class="heading-actions"><span class="live-pill"><i></i><span id="admin-refresh-status">Auto-refreshing</span></span><button class="button secondary" data-refresh="admin"><span data-lucide="refresh"></span> Refresh</button></div></header>
+          <div class="admin-tabs" role="tablist"><button class="active" data-admin-tab="observability"><span data-lucide="chart"></span> Observability</button><button data-admin-tab="harness"><span data-lucide="shieldCheck"></span> Agent harness</button><button data-admin-tab="documentation"><span data-lucide="fileText"></span> Documentation</button></div>
+          <div class="admin-pane active" data-admin-pane="observability">
+            <div class="admin-metric-grid">
+              <article><span data-lucide="clock"></span><small>Process uptime</small><strong id="admin-uptime">—</strong><p>Current daemon process</p></article>
+              <article><span data-lucide="route"></span><small>API requests</small><strong id="admin-api-requests">—</strong><p id="admin-request-rate">— in the last minute</p></article>
+              <article><span data-lucide="gauge"></span><small>p95 latency</small><strong id="admin-p95">—</strong><p id="admin-error-rate">— errors</p></article>
+              <article><span data-lucide="brain"></span><small>Model calls</small><strong id="admin-llm-calls">—</strong><p id="admin-token-usage">— tokens</p></article>
+              <article><span data-lucide="database"></span><small>Persisted rows</small><strong id="admin-db-rows">—</strong><p id="admin-db-size">— on disk</p></article>
+            </div>
+            <div class="admin-observe-grid">
+              <article class="panel admin-chart-card"><header class="panel-head"><div><h3>Request latency</h3><p>Rolling process-local samples; hover for request evidence</p></div><span class="status-badge ready" id="admin-active-requests">0 active</span></header><div class="admin-chart-wrap"><svg id="admin-request-chart" viewBox="0 0 820 230" preserveAspectRatio="none" aria-label="API request latency chart"></svg><div class="chart-tooltip" id="admin-chart-tooltip"></div></div></article>
+              <article class="panel"><header class="panel-head"><div><h3>Status distribution</h3><p>HTTP response families in this process</p></div></header><div id="admin-status-distribution" class="distribution-list"></div></article>
+              <article class="panel table-panel admin-routes"><header class="panel-head inset"><div><h3>Most-used routes</h3><p>Normalized route templates, not raw identifiers</p></div></header><div class="table-wrap"><table><thead><tr><th>Route</th><th>Calls</th></tr></thead><tbody id="admin-route-table"></tbody></table></div></article>
+              <article class="panel"><header class="panel-head"><div><h3>LLM usage</h3><p>Agent and structured-filter calls</p></div></header><div id="admin-llm-panel" class="admin-detail-list"></div></article>
+              <article class="panel"><header class="panel-head"><div><h3>Event pipeline</h3><p>SSE history, subscribers, and observer state</p></div></header><div id="admin-event-panel" class="admin-detail-list"></div></article>
+              <article class="panel"><header class="panel-head"><div><h3>Daemon process</h3><p>Runtime footprint for this server</p></div></header><div id="admin-process-panel" class="admin-detail-list"></div></article>
+            </div>
+          </div>
+          <div class="admin-pane" data-admin-pane="harness">
+            <div id="admin-harness-overview" class="harness-summary"></div>
+            <div class="admin-harness-grid"><article class="panel"><header class="panel-head"><div><h3>Registered tools</h3><p>Read-only evidence and proposal surfaces exposed to the agent loop</p></div><span class="status-badge" id="admin-tool-count">—</span></header><div class="tool-cloud" id="admin-tools"></div></article><article class="panel table-panel"><header class="panel-head inset"><div><h3>Safety policy</h3><p>Mutation risk classification and approval boundary</p></div></header><div class="table-wrap"><table><thead><tr><th>Action</th><th>Risk</th><th>Approval</th></tr></thead><tbody id="admin-policy-table"></tbody></table></div></article></div>
+          </div>
+          <div class="admin-pane" data-admin-pane="documentation">
+            <div class="docs-hero panel"><span class="docs-hero-icon" data-lucide="orbit"></span><div><p class="eyebrow">LOCAL DEVELOPER CONTROL PLANE</p><h2>Operational handbook</h2><p>The agent observes first, builds typed evidence, proposes mutations, waits at the approval boundary, executes exactly the stored action, and records verification.</p></div><div class="docs-actions"><a class="button primary" href="/docs" target="_blank"><span data-lucide="externalLink"></span> Open API explorer</a><a class="button secondary" href="/redoc" target="_blank">ReDoc</a><a class="button secondary" href="/openapi.json" target="_blank">OpenAPI JSON</a></div></div>
+            <div class="docs-grid">
+              <article class="panel"><span data-lucide="network"></span><h3>Resource topology</h3><p>A fresh typed graph joins registered projects, Compose declarations, Docker runtime state, processes, ports, storage, and build files. Runtime data is observed—not treated as persisted truth.</p><code>GET /api/v1/topology</code></article>
+              <article class="panel"><span data-lucide="brain"></span><h3>Structured intelligence</h3><p>A small model may convert natural language into a strict filter plan. The plan is validated, then applied deterministically. Failure falls back to the local parser.</p><code>POST /api/v1/intelligence/filter</code></article>
+              <article class="panel"><span data-lucide="shieldCheck"></span><h3>Safety pipeline</h3><p>Medium-risk and higher mutations require explicit approval. File changes are diffed, validated, backed up, applied atomically, and verified after execution.</p><code>GET /api/v1/approvals</code></article>
+              <article class="panel"><span data-lucide="radio"></span><h3>Live observation</h3><p>Docker events and bounded host polling publish a local SSE stream. Logs and container stats remain on demand and are not written to the database.</p><code>GET /api/v1/events/stream</code></article>
+            </div>
+            <article class="panel docs-runbook"><header class="panel-head"><div><h3>Quick runbook</h3><p>Useful checks when something looks wrong</p></div></header><div><section><b>1</b><span><strong>Confirm the daemon</strong><code>curl http://127.0.0.1:8765/health</code></span></section><section><b>2</b><span><strong>Refresh the registry</strong><code>uv run dev-agent projects --scan</code></span></section><section><b>3</b><span><strong>Inspect a listener</strong><code>uv run dev-agent ports</code></span></section><section><b>4</b><span><strong>Review before execution</strong><code>uv run dev-agent approve APPROVAL_ID</code></span></section></div></article>
+          </div>
+        </section>
         <section class="view" id="view-settings" data-title="Settings" data-eyebrow="LOCAL CAPABILITIES"><header class="page-heading"><div><h1>Runtime capabilities</h1><p>Detected local runtimes and the exact level of control this agent supports.</p></div><button class="button secondary" data-refresh="settings">↻ Refresh</button></header><div class="runtime-grid" id="runtime-grid"><div class="skeleton block"></div></div><article class="panel settings-observation" id="observation-status"></article></section>
       </div>
     </main>
   </div>
 
-  <dialog id="detail-dialog"><div class="dialog-head"><div><p class="eyebrow" id="dialog-eyebrow">DETAILS</p><h2 id="dialog-title">Details</h2></div><button class="icon-button" data-close-dialog aria-label="Close">×</button></div><div id="dialog-content" class="dialog-content"></div></dialog>
-  <aside id="resource-inspector" class="resource-inspector" aria-label="Resource inspector" aria-hidden="true"><header class="inspector-head"><div class="inspector-heading"><span class="inspector-resource-icon" id="inspector-icon">◇</span><div><p class="eyebrow" id="inspector-type">RESOURCE</p><h2 id="inspector-title">Select a resource</h2></div></div><button class="icon-button" id="close-inspector" aria-label="Close inspector">×</button></header><div class="inspector-content" id="inspector-content"></div></aside>
+  <dialog id="detail-dialog"><div class="dialog-head"><div><p class="eyebrow" id="dialog-eyebrow">DETAILS</p><h2 id="dialog-title">Details</h2></div><button class="icon-button" data-close-dialog aria-label="Close"><span data-lucide="x"></span></button></div><div id="dialog-content" class="dialog-content"></div></dialog>
+  <aside id="resource-inspector" class="resource-inspector" aria-label="Resource inspector" aria-hidden="true"><header class="inspector-head"><div class="inspector-heading"><span class="inspector-resource-icon" id="inspector-icon"><span data-lucide="circleHelp"></span></span><div><p class="eyebrow" id="inspector-type">RESOURCE</p><h2 id="inspector-title">Select a resource</h2></div></div><button class="icon-button" id="close-inspector" aria-label="Close inspector"><span data-lucide="x"></span></button></header><div class="inspector-content" id="inspector-content"></div></aside>
   <dialog id="resource-picker" class="resource-picker"><div class="palette-head"><span class="search-mark"></span><input id="resource-picker-input" placeholder="Select a project, container, process, port, or file…" autocomplete="off"><kbd>Esc</kbd></div><div class="picker-scope" id="resource-picker-types"></div><div class="palette-results" id="resource-picker-results"><div class="empty-inline">Loading observed resources…</div></div></dialog>
   <dialog id="command-palette" class="command-palette"><div class="palette-head"><span class="search-mark"></span><input id="palette-input" placeholder="Search resources and actions…" autocomplete="off"><kbd>Esc</kbd></div><div class="palette-results" id="palette-results"><div class="empty-inline">Try a project, port, process, container, or action.</div></div></dialog>
   <div class="toast-stack" id="toasts" aria-live="polite"></div>
+  <script src="/ui/icons.js" defer></script>
   <script src="/ui/app.js" defer></script>
   <script src="/ui/control-plane.js" defer></script>
 </body>

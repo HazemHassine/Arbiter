@@ -40,6 +40,39 @@ def test_chat_provider_surfaces_sanitized_api_error():
     assert raised.value.code == "invalid_request_error"
 
 
+def test_chat_provider_requests_and_parses_strict_structured_output():
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.update(json.loads(request.content))
+        return httpx.Response(
+            200,
+            json={
+                "choices": [{"message": {"role": "assistant", "content": '{"terms":["api"]}'}}],
+                "usage": {"prompt_tokens": 8, "completion_tokens": 4, "total_tokens": 12},
+            },
+        )
+
+    provider = OpenAICompatibleProvider(
+        "https://example.test/v1", "test-key", "gpt-test", transport=httpx.MockTransport(handler)
+    )
+    result, usage = asyncio.run(
+        provider.complete_structured(
+            [{"role": "user", "content": "find api"}],
+            {
+                "type": "object",
+                "properties": {"terms": {"type": "array", "items": {"type": "string"}}},
+                "required": ["terms"],
+                "additionalProperties": False,
+            },
+            name="resource_filter",
+        )
+    )
+    assert captured["response_format"]["json_schema"]["strict"] is True
+    assert result == {"terms": ["api"]}
+    assert usage["total_tokens"] == 12
+
+
 def test_agent_api_degrades_instead_of_returning_500(service_factory, monkeypatch):
     services = service_factory()
     services.settings.llm_api_key = "test-key"

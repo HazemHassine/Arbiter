@@ -1,7 +1,7 @@
 import asyncio
 import json
 import threading
-from collections import deque
+from collections import Counter, deque
 from collections.abc import AsyncIterator
 from contextlib import suppress
 from datetime import UTC, datetime
@@ -14,9 +14,14 @@ class EventBus:
     def __init__(self, history_size: int = 250) -> None:
         self.history: deque[SystemEvent] = deque(maxlen=history_size)
         self._subscribers: set[asyncio.Queue[SystemEvent]] = set()
+        self._published_total = 0
+        self._types: Counter[str] = Counter()
+        self._started_at = datetime.now(UTC)
 
     def publish(self, event: SystemEvent) -> SystemEvent:
         self.history.append(event)
+        self._published_total += 1
+        self._types[event.type] += 1
         for queue in list(self._subscribers):
             try:
                 queue.put_nowait(event)
@@ -27,6 +32,17 @@ class EventBus:
                 except (asyncio.QueueEmpty, asyncio.QueueFull):
                     continue
         return event
+
+    def stats(self) -> dict[str, Any]:
+        return {
+            "started_at": self._started_at.isoformat(),
+            "published_total": self._published_total,
+            "buffered": len(self.history),
+            "history_capacity": self.history.maxlen,
+            "subscribers": len(self._subscribers),
+            "types": dict(self._types.most_common(12)),
+            "last_event": self.history[-1].model_dump(mode="json") if self.history else None,
+        }
 
     def recent(self, limit: int = 100) -> list[SystemEvent]:
         return list(self.history)[-max(1, min(limit, len(self.history))) :]

@@ -1,3 +1,4 @@
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Any
@@ -8,10 +9,12 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
+from dev_agent.admin import AdminService
 from dev_agent.agent.service import AgentService
 from dev_agent.config import Settings, get_settings
 from dev_agent.docker.service import DockerUnavailable
 from dev_agent.integrations.a2a.server import AGENT_CARD
+from dev_agent.intelligence import IntelligenceService
 from dev_agent.make.service import MakeService
 from dev_agent.models import ActionSpec, Risk
 from dev_agent.persistence.tables import ActionRow
@@ -61,6 +64,12 @@ class ImpactRequest(BaseModel):
     project_id: str | None = None
 
 
+class ResourceFilterRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=500)
+    project: str | None = None
+    use_ai: bool = True
+
+
 def create_app(settings: Settings | None = None, services: Services | None = None) -> FastAPI:
     configured = settings or get_settings()
     service_container = services or build_services(configured)
@@ -76,8 +85,27 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
             if service_container.observer:
                 await service_container.observer.stop()
 
-    app = FastAPI(title="Local Developer Control Plane", version="0.2.0", lifespan=lifespan)
+    app = FastAPI(title="Local Developer Control Plane", version="0.3.0", lifespan=lifespan)
     app.state.services = service_container
+
+    @app.middleware("http")
+    async def collect_request_metrics(request: Request, call_next):
+        started = time.monotonic()
+        service_container.telemetry.request_started()
+        status_code = 500
+        try:
+            response = await call_next(request)
+            status_code = response.status_code
+            return response
+        finally:
+            route = request.scope.get("route")
+            route_path = getattr(route, "path", None) or request.url.path
+            service_container.telemetry.request_finished(
+                request.method,
+                route_path,
+                status_code,
+                (time.monotonic() - started) * 1000,
+            )
 
     @app.exception_handler(LookupError)
     async def lookup_error(_request: Request, exc: LookupError):
@@ -99,7 +127,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
 
     @app.get("/health")
     def health() -> dict[str, str]:
-        return {"status": "ok", "version": "0.2.0"}
+        return {"status": "ok", "version": "0.3.0"}
 
     @app.get("/.well-known/agent-card.json")
     def agent_card() -> dict[str, Any]:
@@ -159,6 +187,14 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
         services: Dep, q: str = Query(min_length=1, max_length=200), limit: int = Query(30, ge=1, le=100)
     ) -> list[dict[str, Any]]:
         return services.topology.search(q, limit)
+
+    @router.post("/intelligence/filter")
+    async def intelligent_filter(body: ResourceFilterRequest, services: Dep) -> dict[str, Any]:
+        return await IntelligenceService(services).filter(body.query, project=body.project, use_ai=body.use_ai)
+
+    @router.get("/admin/overview")
+    def admin_overview(services: Dep) -> dict[str, Any]:
+        return AdminService(services).overview()
 
     @router.get("/runtimes")
     def runtimes(services: Dep) -> list[dict[str, Any]]:

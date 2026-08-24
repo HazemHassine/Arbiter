@@ -8,6 +8,12 @@
     topologyOffset: { x: 0, y: 0 },
     topologyTypes: new Set(),
     topologyDragging: null,
+    topologyPositions: new Map(),
+    topologyLayout: "flow",
+    topologySelectedId: "",
+    topologyFiltered: null,
+    topologyFilterResult: null,
+    topologyFilterQuery: "",
     workspaces: [],
     processes: [],
     activity: [],
@@ -29,6 +35,9 @@
     metricTimer: null,
     previewEndpoints: [],
     previewUrl: "",
+    adminTimer: null,
+    adminData: null,
+    adminTab: "observability",
   };
 
   const $ = cp.$;
@@ -56,6 +65,7 @@
       processes: loadProcesses,
       files: loadFilesView,
       activity: loadActivity,
+      admin: loadAdmin,
       settings: loadSettings,
     };
     if (loaders[view]) await loaders[view]();
@@ -197,29 +207,54 @@
     const path = project ? `/topology/project/${encodeURIComponent(project)}` : "/topology";
     const graph = await safe(() => cp.request(path), { nodes: [], edges: [], warnings: [] });
     state.topology = graph;
+    state.topologyFiltered = null;
+    state.topologyFilterResult = null;
+    state.topologyFilterQuery = "";
+    state.topologySelectedId = "";
+    state.topologyPositions = new Map();
     state.topologyScale = 1;
     state.topologyOffset = { x: 0, y: 0 };
     state.topologyTypes = new Set(graph.nodes.map(node => node.resource_type));
-    renderTopology();
+    updateSmartFilterStatus();
+    renderTopology({ fit: true });
   }
 
-  function renderTopology() {
-    const graph = state.topology;
+  function renderTopology(options = {}) {
+    const graph = state.topologyFiltered || state.topology;
     if (!graph) return;
     const query = $("#topology-search").value.trim().toLowerCase();
     const activeTypes = state.topologyTypes;
     let nodes = graph.nodes.filter(node => activeTypes.has(node.resource_type));
-    if (query) nodes = nodes.filter(node => `${node.label} ${JSON.stringify(node.attributes)}`.toLowerCase().includes(query));
-    if (nodes.length > 110 && !query) nodes = nodes.slice(0, 110);
+    const smartQueryActive = state.topologyFiltered && state.topologyFilterQuery === query;
+    if (query && !smartQueryActive) {
+      nodes = nodes.filter(node => `${node.label} ${node.status || ""} ${JSON.stringify(node.attributes)}`.toLowerCase().includes(query));
+    }
+    const sourceCount = nodes.length;
+    if (nodes.length > 160 && !query) nodes = nodes.slice(0, 160);
     const selected = new Set(nodes.map(node => node.id));
     const edges = graph.edges.filter(edge => selected.has(edge.source) && selected.has(edge.target));
     renderTopologyLegend(graph.nodes);
     drawTopology(nodes, edges);
-    const warnings = (graph.warnings || []).slice(0, 6);
+    if (options.fit) window.requestAnimationFrame(fitTopology);
+    renderTopologySummary(nodes, edges, sourceCount);
+  }
+
+  function renderTopologySummary(nodes, edges, sourceCount) {
+    const graph = state.topologyFiltered || state.topology;
+    const selected = nodes.find(node => node.id === state.topologySelectedId);
+    const connectedEdges = selected ? edges.filter(edge => selected.id === edge.source || selected.id === edge.target) : [];
+    const connectedIds = new Set(connectedEdges.flatMap(edge => [edge.source, edge.target]).filter(id => id !== selected?.id));
+    const connected = nodes.filter(node => connectedIds.has(node.id));
+    const result = state.topologyFilterResult;
+    const filterSummary = result ? `<div class="smart-plan-card"><div><span class="smart-mode">${cp.icon(result.mode === "ai" ? "brain" : "listFilter")} ${esc(result.mode === "ai" ? "AI interpreted" : "Locally parsed")}</span><strong>${esc(result.plan.explanation)}</strong><p>${result.matched_count} exact matches · ${result.visible_count} with context · ${Math.round((result.plan.confidence || 0) * 100)}% confidence</p></div><button class="mini-button" id="clear-smart-filter">Clear</button></div>` : "";
+    const selectedCard = selected ? `<div class="selected-node-card"><div class="selected-node-title"><span class="resource-icon" style="--resource-color:${colors[selected.resource_type] || "#8fa0b2"}">${cp.icon(window.iconPack?.resource(selected.resource_type) || "circleHelp")}</span><div><p class="eyebrow">SELECTED</p><h3>${esc(selected.label)}</h3><p>${esc(selected.resource_type.replaceAll("_", " "))} · ${esc(selected.status || "observed")}</p></div></div><div class="selected-node-stats"><span><b>${connected.length}</b> neighbors</span><span><b>${connectedEdges.length}</b> links</span></div><button class="button secondary wide" data-open-graph-resource="${esc(selected.resource_type)}" data-resource-id="${esc(selected.resource_id)}">${cp.icon("scanSearch")} Inspect evidence</button></div>` : `<div class="graph-help"><span>${cp.icon("move")}</span><div><strong>Explore the graph</strong><p>Wheel to zoom at the pointer. Drag the canvas to pan, drag nodes to untangle them, click to focus, and double-click to inspect.</p></div></div>`;
+    const warnings = (graph?.warnings || []).slice(0, 4);
     $("#topology-summary").innerHTML = `
-      <p class="eyebrow">LIVE GRAPH</p><h3>${nodes.length} resources · ${edges.length} relationships</h3>
-      <p class="muted">Click any node to inspect it. Drag the canvas to pan, use the controls to zoom, and scope the graph to a workspace when it becomes dense.</p>
-      <div class="topology-warnings">${warnings.length ? warnings.map(warning => `<div class="warning-row"><span>!</span><div><b>${esc(warning.severity || "notice")}</b><p>${esc(warning.message)}</p></div></div>`).join("") : '<div class="empty-inline">No topology warnings in this scope.</div>'}</div>`;
+      <div class="topology-statline"><span><b>${nodes.length}</b> visible</span><span><b>${edges.length}</b> relationships</span><span><b>${state.topologyLayout}</b> layout</span></div>
+      ${sourceCount > nodes.length ? `<p class="graph-limit-note">Showing the first ${nodes.length} of ${sourceCount} resources. Scope or filter to reveal a useful subgraph.</p>` : ""}
+      ${filterSummary}${selectedCard}
+      <div class="topology-warnings">${warnings.length ? warnings.map(warning => `<div class="warning-row"><span>${cp.icon("info")}</span><div><b>${esc(warning.severity || "notice")}</b><p>${esc(warning.message)}</p></div></div>`).join("") : '<div class="empty-inline compact">No topology warnings in this scope.</div>'}</div>`;
+    window.iconPack?.render($("#topology-summary"));
   }
 
   function renderTopologyLegend(nodes) {
@@ -229,69 +264,233 @@
 
   function drawTopology(nodes, edges) {
     const svg = $("#topology-graph");
-    const byType = new Map();
-    nodes.forEach(node => { const list = byType.get(node.resource_type) || []; list.push(node); byType.set(node.resource_type, list); });
-    const types = [...byType.keys()].sort();
-    const columnWidth = 210;
-    const maxRows = Math.max(1, ...[...byType.values()].map(list => list.length));
-    const width = Math.max(1200, types.length * columnWidth + 120);
-    const height = Math.max(620, maxRows * 92 + 130);
-    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
-    svg.innerHTML = "";
+    svg.setAttribute("viewBox", "0 0 1200 720");
+    svg.innerHTML = '<defs><marker id="graph-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L8,4 L0,8 Z" fill="currentColor"/></marker></defs>';
     const transform = document.createElementNS("http://www.w3.org/2000/svg", "g");
     transform.setAttribute("id", "topology-transform");
     transform.setAttribute("transform", topologyTransform());
     svg.append(transform);
-    const positions = new Map();
-    types.forEach((type, typeIndex) => {
-      const items = byType.get(type);
-      const x = 120 + typeIndex * columnWidth;
-      const title = document.createElementNS("http://www.w3.org/2000/svg", "text");
-      title.setAttribute("x", String(x)); title.setAttribute("y", "42"); title.setAttribute("class", "graph-group-title"); title.textContent = type.replaceAll("_", " "); transform.append(title);
-      items.forEach((node, index) => positions.set(node.id, { x, y: 88 + index * 92 }));
-    });
+    const positions = ensureTopologyPositions(nodes);
+    if (state.topologyLayout === "flow") drawLaneLabels(nodes, positions, transform);
+    const connectedIds = topologyConnectedIds(edges);
     edges.forEach(edge => {
       const source = positions.get(edge.source), target = positions.get(edge.target);
       if (!source || !target) return;
       const line = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      const bend = (target.x - source.x) * 0.45;
-      line.setAttribute("d", `M ${source.x + 67} ${source.y} C ${source.x + 67 + bend} ${source.y}, ${target.x - 67 - bend} ${target.y}, ${target.x - 67} ${target.y}`);
-      line.setAttribute("class", "graph-edge"); line.dataset.relationship = edge.relationship; transform.append(line);
+      line.setAttribute("d", graphEdgePath(source, target));
+      const isConnected = state.topologySelectedId && (edge.source === state.topologySelectedId || edge.target === state.topologySelectedId);
+      line.setAttribute("class", `graph-edge ${isConnected ? "connected" : state.topologySelectedId ? "dimmed" : ""}`);
+      line.setAttribute("marker-end", "url(#graph-arrow)");
+      line.dataset.relationship = edge.relationship;
+      line.dataset.source = edge.source;
+      line.dataset.target = edge.target;
+      transform.append(line);
+      if (isConnected) {
+        const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        label.setAttribute("x", String((source.x + target.x) / 2));
+        label.setAttribute("y", String((source.y + target.y) / 2 - 7));
+        label.setAttribute("class", "graph-edge-label");
+        label.textContent = edge.relationship.replaceAll("_", " ").toLowerCase();
+        transform.append(label);
+      }
     });
     nodes.forEach(node => {
       const point = positions.get(node.id);
       const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
-      group.setAttribute("class", "graph-node"); group.setAttribute("transform", `translate(${point.x - 67}, ${point.y - 24})`);
-      group.dataset.resourceType = node.resource_type; group.dataset.resourceId = node.resource_id;
+      const selectionClass = node.id === state.topologySelectedId ? "selected" : state.topologySelectedId && !connectedIds.has(node.id) ? "dimmed" : state.topologySelectedId ? "connected" : "";
+      const smartClass = state.topologyFilterResult?.matched_node_ids?.includes(node.id) ? "smart-match" : "";
+      group.setAttribute("class", `graph-node ${selectionClass} ${smartClass}`);
+      group.setAttribute("transform", `translate(${point.x - 82}, ${point.y - 28})`);
+      group.dataset.resourceType = node.resource_type; group.dataset.resourceId = node.resource_id; group.dataset.graphNodeId = node.id;
       const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-      rect.setAttribute("width", "134"); rect.setAttribute("height", "48"); rect.setAttribute("rx", "7"); rect.setAttribute("fill", "#0d0d0d"); rect.setAttribute("stroke", colors[node.resource_type] || "#8a8a8a"); group.append(rect);
-      const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle"); dot.setAttribute("cx", "14"); dot.setAttribute("cy", "17"); dot.setAttribute("r", "4"); dot.setAttribute("fill", colors[node.resource_type] || "#8fa0b2"); group.append(dot);
-      const label = document.createElementNS("http://www.w3.org/2000/svg", "text"); label.setAttribute("x", "24"); label.setAttribute("y", "20"); label.setAttribute("class", "graph-label"); label.textContent = shorten(node.label, 16); group.append(label);
-      const sub = document.createElementNS("http://www.w3.org/2000/svg", "text"); sub.setAttribute("x", "12"); sub.setAttribute("y", "37"); sub.setAttribute("class", "graph-sub"); sub.textContent = shorten(node.status || node.resource_type.replaceAll("_", " "), 19); group.append(sub);
+      rect.setAttribute("width", "164"); rect.setAttribute("height", "56"); rect.setAttribute("rx", "10"); rect.setAttribute("fill", "#111722"); rect.setAttribute("stroke", colors[node.resource_type] || "#8a8a8a"); group.append(rect);
+      const accent = document.createElementNS("http://www.w3.org/2000/svg", "rect"); accent.setAttribute("width", "4"); accent.setAttribute("height", "30"); accent.setAttribute("x", "10"); accent.setAttribute("y", "13"); accent.setAttribute("rx", "2"); accent.setAttribute("fill", colors[node.resource_type] || "#8fa0b2"); group.append(accent);
+      const label = document.createElementNS("http://www.w3.org/2000/svg", "text"); label.setAttribute("x", "24"); label.setAttribute("y", "23"); label.setAttribute("class", "graph-label"); label.textContent = shorten(node.label, 20); group.append(label);
+      const sub = document.createElementNS("http://www.w3.org/2000/svg", "text"); sub.setAttribute("x", "24"); sub.setAttribute("y", "42"); sub.setAttribute("class", "graph-sub"); sub.textContent = shorten(`${node.resource_type.replaceAll("_", " ")} · ${node.status || "observed"}`, 27); group.append(sub);
+      const handle = document.createElementNS("http://www.w3.org/2000/svg", "circle"); handle.setAttribute("cx", "151"); handle.setAttribute("cy", "15"); handle.setAttribute("r", "3"); handle.setAttribute("class", "graph-node-handle"); group.append(handle);
       transform.append(group);
     });
-    attachGraphPan(svg);
+    attachGraphInteractions(svg);
   }
 
+  const flowLanes = [
+    { name: "Workspace", types: ["project", "compose_project", "compose_file", "env_file"] },
+    { name: "Build & orchestration", types: ["dockerfile", "makefile", "make_target", "compose_service"] },
+    { name: "Runtime", types: ["container", "process", "runtime"] },
+    { name: "Network", types: ["port", "network"] },
+    { name: "Storage & artifacts", types: ["image", "volume"] },
+  ];
+  const laneFor = type => Math.max(0, flowLanes.findIndex(lane => lane.types.includes(type)));
+  function ensureTopologyPositions(nodes) {
+    const ids = new Set(nodes.map(node => node.id));
+    [...state.topologyPositions.keys()].forEach(id => { if (!ids.has(id)) state.topologyPositions.delete(id); });
+    if (state.topologyLayout === "radial") {
+      const ordered = [...nodes].sort((a, b) => laneFor(a.resource_type) - laneFor(b.resource_type) || a.label.localeCompare(b.label));
+      ordered.forEach((node, index) => {
+        if (state.topologyPositions.has(node.id)) return;
+        const ring = Math.floor(index / 28);
+        const ringItems = Math.min(28, ordered.length - ring * 28);
+        const angle = ((index % 28) / Math.max(1, ringItems)) * Math.PI * 2 - Math.PI / 2;
+        const radiusX = 300 + ring * 205, radiusY = 220 + ring * 145;
+        state.topologyPositions.set(node.id, { x: 600 + Math.cos(angle) * radiusX, y: 360 + Math.sin(angle) * radiusY });
+      });
+      return state.topologyPositions;
+    }
+    const grouped = flowLanes.map(() => []);
+    nodes.forEach(node => grouped[laneFor(node.resource_type)].push(node));
+    grouped.forEach(list => list.sort((a, b) => a.resource_type.localeCompare(b.resource_type) || a.label.localeCompare(b.label)));
+    grouped.forEach((list, laneIndex) => list.forEach((node, index) => {
+      if (!state.topologyPositions.has(node.id)) state.topologyPositions.set(node.id, { x: 120 + laneIndex * 245, y: 105 + index * 82 });
+    }));
+    return state.topologyPositions;
+  }
+  function drawLaneLabels(nodes, positions, transform) {
+    flowLanes.forEach((lane, index) => {
+      if (!nodes.some(node => lane.types.includes(node.resource_type))) return;
+      const title = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      title.setAttribute("x", String(38 + index * 245)); title.setAttribute("y", "44"); title.setAttribute("class", "graph-group-title"); title.textContent = lane.name; transform.append(title);
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      const laneNodes = nodes.filter(node => lane.types.includes(node.resource_type)).map(node => positions.get(node.id));
+      line.setAttribute("x1", String(38 + index * 245)); line.setAttribute("x2", String(202 + index * 245)); line.setAttribute("y1", "57"); line.setAttribute("y2", "57"); line.setAttribute("class", "graph-lane-rule"); transform.append(line);
+    });
+  }
+  function topologyConnectedIds(edges) {
+    const ids = new Set(state.topologySelectedId ? [state.topologySelectedId] : []);
+    edges.forEach(edge => { if (edge.source === state.topologySelectedId || edge.target === state.topologySelectedId) { ids.add(edge.source); ids.add(edge.target); } });
+    return ids;
+  }
+  function graphEdgePath(source, target) {
+    const dx = target.x - source.x, direction = dx >= 0 ? 1 : -1;
+    const startX = source.x + direction * 82, endX = target.x - direction * 82;
+    const bend = Math.max(45, Math.abs(endX - startX) * .48);
+    return `M ${startX} ${source.y} C ${startX + direction * bend} ${source.y}, ${endX - direction * bend} ${target.y}, ${endX} ${target.y}`;
+  }
   const shorten = (value, length) => String(value || "").length > length ? `${String(value).slice(0, length - 1)}…` : String(value || "");
   const topologyTransform = () => `translate(${state.topologyOffset.x} ${state.topologyOffset.y}) scale(${state.topologyScale})`;
-  function updateTopologyTransform() { $("#topology-transform")?.setAttribute("transform", topologyTransform()); }
-  function zoomTopology(direction) {
-    state.topologyScale = direction === "in" ? Math.min(2.2, state.topologyScale + .16) : direction === "out" ? Math.max(.45, state.topologyScale - .16) : 1;
-    if (direction === "reset") state.topologyOffset = { x: 0, y: 0 };
+  function updateTopologyTransform() { $("#topology-transform")?.setAttribute("transform", topologyTransform()); updateZoomLabel(); }
+  function updateZoomLabel() { const label = $("#topology-zoom-level"); if (label) label.textContent = `${Math.round(state.topologyScale * 100)}%`; }
+  function zoomAt(nextScale, point = { x: 600, y: 360 }) {
+    const scale = Math.min(3.2, Math.max(.12, nextScale));
+    const world = { x: (point.x - state.topologyOffset.x) / state.topologyScale, y: (point.y - state.topologyOffset.y) / state.topologyScale };
+    state.topologyOffset = { x: point.x - world.x * scale, y: point.y - world.y * scale };
+    state.topologyScale = scale;
     updateTopologyTransform();
   }
-  function attachGraphPan(svg) {
-    svg.onpointerdown = event => { if (event.target.closest(".graph-node")) return; state.topologyDragging = { x: event.clientX, y: event.clientY, offset: { ...state.topologyOffset } }; svg.setPointerCapture(event.pointerId); };
-    svg.onpointermove = event => { if (!state.topologyDragging) return; state.topologyOffset = { x: state.topologyDragging.offset.x + (event.clientX - state.topologyDragging.x), y: state.topologyDragging.offset.y + (event.clientY - state.topologyDragging.y) }; updateTopologyTransform(); };
-    svg.onpointerup = () => { state.topologyDragging = null; };
+  function zoomTopology(direction) {
+    if (direction === "fit" || direction === "reset") { fitTopology(); return; }
+    zoomAt(state.topologyScale * (direction === "in" ? 1.2 : 1 / 1.2));
+  }
+  function fitTopology() {
+    const points = [...state.topologyPositions.values()];
+    if (!points.length) { state.topologyScale = 1; state.topologyOffset = { x: 0, y: 0 }; updateTopologyTransform(); return; }
+    const minX = Math.min(...points.map(point => point.x)) - 105, maxX = Math.max(...points.map(point => point.x)) + 105;
+    const minY = Math.min(...points.map(point => point.y)) - 75, maxY = Math.max(...points.map(point => point.y)) + 75;
+    const scale = Math.min(1.4, 1100 / Math.max(1, maxX - minX), 640 / Math.max(1, maxY - minY));
+    state.topologyScale = Math.max(.12, scale);
+    state.topologyOffset = { x: 600 - ((minX + maxX) / 2) * state.topologyScale, y: 360 - ((minY + maxY) / 2) * state.topologyScale };
+    updateTopologyTransform();
+  }
+  function clientToSvg(svg, clientX, clientY) {
+    const bounds = svg.getBoundingClientRect();
+    return { x: (clientX - bounds.left) * 1200 / bounds.width, y: (clientY - bounds.top) * 720 / bounds.height };
+  }
+  function updateGraphGeometry() {
+    $$(".graph-node", $("#topology-graph")).forEach(node => {
+      const point = state.topologyPositions.get(node.dataset.graphNodeId);
+      if (point) node.setAttribute("transform", `translate(${point.x - 82}, ${point.y - 28})`);
+    });
+    $$(".graph-edge", $("#topology-graph")).forEach(edge => {
+      const source = state.topologyPositions.get(edge.dataset.source), target = state.topologyPositions.get(edge.dataset.target);
+      if (source && target) edge.setAttribute("d", graphEdgePath(source, target));
+    });
+  }
+  function selectTopologyNode(identifier) {
+    state.topologySelectedId = state.topologySelectedId === identifier ? "" : identifier;
+    renderTopology();
+  }
+  function attachGraphInteractions(svg) {
+    svg.onwheel = event => {
+      event.preventDefault();
+      const point = clientToSvg(svg, event.clientX, event.clientY);
+      zoomAt(state.topologyScale * Math.exp(-event.deltaY * .0014), point);
+    };
+    svg.onpointerdown = event => {
+      if (event.button !== 0) return;
+      const node = event.target.closest(".graph-node");
+      const point = clientToSvg(svg, event.clientX, event.clientY);
+      if (node) {
+        const position = state.topologyPositions.get(node.dataset.graphNodeId);
+        state.topologyDragging = { mode: "node", id: node.dataset.graphNodeId, start: point, origin: { ...position }, moved: false };
+      } else {
+        state.topologyDragging = { mode: "canvas", start: point, origin: { ...state.topologyOffset }, moved: false };
+      }
+      svg.setPointerCapture(event.pointerId);
+    };
+    svg.onpointermove = event => {
+      const drag = state.topologyDragging;
+      if (!drag) return;
+      const point = clientToSvg(svg, event.clientX, event.clientY);
+      const dx = point.x - drag.start.x, dy = point.y - drag.start.y;
+      drag.moved ||= Math.abs(dx) + Math.abs(dy) > 3;
+      if (drag.mode === "canvas") {
+        state.topologyOffset = { x: drag.origin.x + dx, y: drag.origin.y + dy };
+        updateTopologyTransform();
+      } else {
+        state.topologyPositions.set(drag.id, { x: drag.origin.x + dx / state.topologyScale, y: drag.origin.y + dy / state.topologyScale });
+        updateGraphGeometry();
+      }
+    };
+    svg.onpointerup = event => {
+      const drag = state.topologyDragging;
+      if (drag?.mode === "node" && !drag.moved) selectTopologyNode(drag.id);
+      state.topologyDragging = null;
+      if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
+    };
+    svg.onclick = event => { if (!event.target.closest(".graph-node") && !state.topologyDragging) { state.topologySelectedId = ""; renderTopology(); } event.stopPropagation(); };
+    svg.ondblclick = event => {
+      const node = event.target.closest(".graph-node");
+      if (node) openResource(node.dataset.resourceType, node.dataset.resourceId);
+      event.stopPropagation();
+    };
+  }
+
+  async function applyIntelligentTopologyFilter() {
+    const input = $("#topology-search");
+    const query = input.value.trim();
+    if (!query) { clearIntelligentTopologyFilter(); return; }
+    const button = $("#topology-smart-filter");
+    button.disabled = true; button.classList.add("loading");
+    try {
+      const result = await cp.request("/intelligence/filter", { method: "POST", body: JSON.stringify({ query, project: $("#topology-project").value || null, use_ai: true }) });
+      state.topologyFiltered = result.graph;
+      state.topologyFilterResult = result;
+      state.topologyFilterQuery = query.toLowerCase();
+      state.topologyPositions = new Map();
+      state.topologyTypes = new Set(result.graph.nodes.map(node => node.resource_type));
+      updateSmartFilterStatus();
+      renderTopology({ fit: true });
+      cp.toast(`${result.mode === "ai" ? "AI" : "Local"} filter found ${result.matched_count} exact matches.`, "success");
+    } finally { button.disabled = false; button.classList.remove("loading"); }
+  }
+  function clearIntelligentTopologyFilter() {
+    state.topologyFiltered = null; state.topologyFilterResult = null; state.topologyFilterQuery = ""; state.topologyPositions = new Map();
+    state.topologyTypes = new Set((state.topology?.nodes || []).map(node => node.resource_type));
+    updateSmartFilterStatus(); renderTopology({ fit: true });
+  }
+  function updateSmartFilterStatus() {
+    const target = $("#topology-query-state");
+    if (!target) return;
+    const result = state.topologyFilterResult;
+    target.className = `query-state ${result ? "active" : ""}`;
+    target.innerHTML = result ? `${cp.icon(result.mode === "ai" ? "brain" : "listFilter")} ${result.mode === "ai" ? "AI plan active" : "Local plan active"}` : `${cp.icon("search")} Local text filter`;
+    window.iconPack?.render(target);
   }
 
   async function openResource(type, id) {
     const known = [state.resourcePickerGraph, state.topology].filter(Boolean).flatMap(graph => graph.nodes || []).find(node => node.resource_type === type && node.resource_id === id);
     $("#inspector-type").textContent = type.replaceAll("_", " ").toUpperCase();
     $("#inspector-title").textContent = known?.label || "Loading live evidence…";
-    $("#inspector-icon").textContent = resourceGlyph(type);
+    $("#inspector-icon").innerHTML = resourceIcon(type);
     $("#inspector-content").innerHTML = '<div class="empty-inline"><span class="spinner"></span>Correlating runtime and configuration evidence…</div>';
     if (known) { state.selectedResource = known; $("#selected-resource-label").textContent = known.label; }
     const panel = $("#resource-inspector"); panel.classList.add("open"); panel.setAttribute("aria-hidden", "false");
@@ -303,7 +502,7 @@
     $("#selected-resource-label").textContent = detail.node.label;
     $("#inspector-type").textContent = detail.node.resource_type.replaceAll("_", " ").toUpperCase();
     $("#inspector-title").textContent = detail.node.label;
-    $("#inspector-icon").textContent = resourceGlyph(detail.node.resource_type);
+    $("#inspector-icon").innerHTML = resourceIcon(detail.node.resource_type);
     const attributes = Object.entries(detail.node.attributes || {}).filter(([key]) => !["content", "command"].includes(key));
     $("#inspector-content").innerHTML = `
       <div class="inspector-status">${cp.badge(detail.node.status || "observed")}<span class="inspector-meta">Observed ${formatTime(detail.generated_at)}</span></div>
@@ -315,9 +514,7 @@
       <div class="inspector-section"><p class="eyebrow">RELATIONSHIPS</p><div class="relationship-list">${detail.relationships.map(edge => `<span>${esc(edge.relationship)}</span>`).join("") || '<span>None</span>'}</div></div>
       <div class="inspector-section"><div class="inspector-section-head"><p class="eyebrow">RAW EVIDENCE</p><span class="inspector-meta">Read only</span></div><pre class="inspector-json">${esc(JSON.stringify({ node: detail.node, relationships: detail.relationships }, null, 2))}</pre></div>`;
   }
-  function resourceGlyph(type) {
-    return ({ project: "◇", compose_project: "◈", compose_service: "S", container: "□", image: "⬡", volume: "◉", network: "⌘", port: "⇄", process: ">_", dockerfile: "D", compose_file: "C", makefile: "M", make_target: "↗", env_file: "E", runtime: "R" })[type] || "◇";
-  }
+  function resourceIcon(type) { return cp.icon(window.iconPack?.resource(type) || "circleHelp"); }
   function resourceActions(node, related = []) {
     if (node.resource_type === "container") {
       const port = node.attributes.ports?.[0]?.host_port || related.find(item => item.resource_type === "port")?.attributes?.port;
@@ -641,6 +838,98 @@
     }, 900);
   }
 
+  async function loadAdmin() {
+    window.clearTimeout(state.adminTimer);
+    $("#admin-refresh-status").textContent = "Refreshing…";
+    const data = await safe(() => cp.request("/admin/overview"), null);
+    if (!data) { $("#admin-refresh-status").textContent = "Unavailable"; return; }
+    state.adminData = data;
+    renderAdmin(data);
+    $("#admin-refresh-status").textContent = `Updated ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
+    if ((location.hash.slice(1) || "overview") === "admin") state.adminTimer = window.setTimeout(loadAdmin, 5000);
+  }
+
+  function renderAdmin(data) {
+    const telemetry = data.telemetry || {}, requests = telemetry.requests || {}, llm = telemetry.llm || {};
+    const database = data.database || {}, events = data.events || {}, process = data.process || {}, harness = data.harness || {};
+    $("#admin-uptime").textContent = formatDuration(telemetry.uptime_seconds || 0);
+    $("#admin-api-requests").textContent = Number(requests.total || 0).toLocaleString();
+    $("#admin-request-rate").textContent = `${requests.requests_last_minute || 0} in the last minute`;
+    $("#admin-p95").textContent = `${Number(requests.latency_ms?.p95 || 0).toFixed(1)} ms`;
+    $("#admin-error-rate").textContent = `${((requests.error_rate || 0) * 100).toFixed(2)}% server errors`;
+    $("#admin-llm-calls").textContent = Number(llm.calls || 0).toLocaleString();
+    $("#admin-token-usage").textContent = `${Number(llm.total_tokens || 0).toLocaleString()} observed tokens`;
+    $("#admin-db-rows").textContent = Number(database.total_rows || 0).toLocaleString();
+    $("#admin-db-size").textContent = `${cp.fmtBytes(database.size_bytes || 0)} on disk`;
+    $("#admin-active-requests").textContent = `${requests.active || 0} active`;
+    renderRequestChart(requests.samples || []);
+    const statuses = Object.entries(requests.statuses || {});
+    const statusTotal = Math.max(1, statuses.reduce((sum, [, count]) => sum + count, 0));
+    $("#admin-status-distribution").innerHTML = statuses.length ? statuses.sort().map(([status, count]) => `<div class="distribution-row"><div><span>${esc(status)}</span><b>${esc(count)}</b></div><div><i class="status-${esc(status[0])}" style="width:${Math.max(2, count / statusTotal * 100)}%"></i></div></div>`).join("") : '<div class="empty-inline">No request responses sampled yet.</div>';
+    $("#admin-route-table").innerHTML = (requests.routes || []).length ? requests.routes.map(route => `<tr><td class="mono">${esc(route.route)}</td><td>${Number(route.count).toLocaleString()}</td></tr>`).join("") : '<tr><td colspan="2"><div class="empty-inline">No normalized routes recorded.</div></td></tr>';
+    const modelNames = Object.entries(llm.models || {}).map(([name, count]) => `${name} (${count})`).join(", ") || "No calls yet";
+    $("#admin-llm-panel").innerHTML = detailRows([
+      ["Models", modelNames], ["Successful", `${llm.successful || 0} / ${llm.calls || 0}`],
+      ["Input tokens", Number(llm.input_tokens || 0).toLocaleString()], ["Output tokens", Number(llm.output_tokens || 0).toLocaleString()],
+      ["Last operation", llm.last_call?.operation || "—"], ["Last latency", llm.last_call ? `${llm.last_call.duration_ms} ms` : "—"],
+    ]);
+    $("#admin-event-panel").innerHTML = detailRows([
+      ["Observer", data.observer?.running ? "Running" : "Stopped"], ["Docker stream", data.observer?.docker_event_stream ? "Connected" : "Unavailable"],
+      ["Published", Number(events.published_total || 0).toLocaleString()], ["Buffered", `${events.buffered || 0} / ${events.history_capacity || 0}`],
+      ["SSE subscribers", events.subscribers || 0], ["Last event", events.last_event?.type || "Waiting for change"],
+    ]);
+    $("#admin-process-panel").innerHTML = detailRows([
+      ["PID", process.pid || "—"], ["Resident memory", cp.fmtBytes(process.rss_bytes || 0)], ["CPU time", `${process.cpu_time_seconds || 0} s`],
+      ["Threads", process.threads || 0], ["Python", process.python || "—"], ["Load average", (process.load_average || []).map(value => Number(value).toFixed(2)).join(" · ") || "—"],
+    ]);
+    renderHarness(harness);
+    window.iconPack?.render($("#view-admin"));
+  }
+  function detailRows(rows) { return rows.map(([label, value]) => `<div><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`).join(""); }
+  function formatDuration(seconds) {
+    const total = Math.max(0, Math.floor(seconds));
+    const days = Math.floor(total / 86400), hours = Math.floor(total % 86400 / 3600), minutes = Math.floor(total % 3600 / 60);
+    return days ? `${days}d ${hours}h` : hours ? `${hours}h ${minutes}m` : `${minutes}m ${total % 60}s`;
+  }
+  function renderRequestChart(samples) {
+    const svg = $("#admin-request-chart"), tooltip = $("#admin-chart-tooltip");
+    if (!samples.length) { svg.innerHTML = '<text x="410" y="118" text-anchor="middle" class="chart-empty">Request samples will appear here.</text>'; tooltip.classList.remove("visible"); return; }
+    const values = samples.map(sample => Number(sample.duration_ms || 0));
+    const max = Math.max(1, ...values, Number(state.adminData?.telemetry?.requests?.latency_ms?.p95 || 0) * 1.25);
+    const points = samples.map((sample, index) => ({ x: 20 + index * 780 / Math.max(1, samples.length - 1), y: 205 - Math.min(max, Number(sample.duration_ms || 0)) / max * 175, sample }));
+    const line = points.map((point, index) => `${index ? "L" : "M"}${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
+    const area = `${line} L${points.at(-1).x.toFixed(1)},205 L${points[0].x.toFixed(1)},205 Z`;
+    const grid = [30, 73.75, 117.5, 161.25, 205].map((y, index) => `<line x1="20" x2="800" y1="${y}" y2="${y}" class="chart-grid"/><text x="8" y="${y + 3}" class="chart-axis">${Math.round(max * (4 - index) / 4)}</text>`).join("");
+    svg.innerHTML = `${grid}<defs><linearGradient id="latency-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7aa2ff" stop-opacity=".3"/><stop offset="1" stop-color="#7aa2ff" stop-opacity="0"/></linearGradient></defs><path d="${area}" class="chart-area"/><path d="${line}" class="chart-line"/><circle id="admin-chart-cursor" cx="${points.at(-1).x}" cy="${points.at(-1).y}" r="4" class="chart-cursor"/>`;
+    svg.onpointermove = event => {
+      const bounds = svg.getBoundingClientRect();
+      const ratio = Math.min(1, Math.max(0, (event.clientX - bounds.left) / bounds.width));
+      const point = points[Math.round(ratio * (points.length - 1))];
+      const cursor = $("#admin-chart-cursor"); cursor.setAttribute("cx", point.x); cursor.setAttribute("cy", point.y);
+      tooltip.innerHTML = `<strong>${esc(point.sample.route)}</strong><span>${esc(point.sample.duration_ms)} ms · HTTP ${esc(point.sample.status_code)}</span><small>${esc(new Date(point.sample.time).toLocaleTimeString())}</small>`;
+      tooltip.style.left = `${Math.min(bounds.width - 210, Math.max(8, event.clientX - bounds.left + 12))}px`;
+      tooltip.style.top = `${Math.max(8, event.clientY - bounds.top - 72)}px`;
+      tooltip.classList.add("visible");
+    };
+    svg.onpointerleave = () => tooltip.classList.remove("visible");
+  }
+  function renderHarness(harness) {
+    const configured = harness.provider_configured;
+    $("#admin-harness-overview").innerHTML = `
+      <article><span>${cp.icon("bot")}</span><div><small>Agent model</small><strong>${esc(harness.agent_model || "Deterministic only")}</strong><p>${configured ? "Provider configured" : "No main model configured"}</p></div></article>
+      <article><span>${cp.icon("brain")}</span><div><small>Filter interpreter</small><strong>${esc(harness.filter_model || "Disabled")}</strong><p>${harness.structured_filtering ? "Strict output enabled" : "Local parser fallback"}</p></div></article>
+      <article><span>${cp.icon("shieldCheck")}</span><div><small>Approval boundary</small><strong>Medium+ always gated</strong><p>Read-only ${harness.auto_approve?.read_only ? "automatic" : "manual"}</p></div></article>
+      <article><span>${cp.icon("scanSearch")}</span><div><small>Discovery</small><strong>${esc((harness.project_roots || []).join(", ") || "No roots")}</strong><p>Maximum depth ${esc(harness.project_scan_depth || "—")}</p></div></article>`;
+    $("#admin-tool-count").textContent = `${harness.tool_count || 0} tools`;
+    $("#admin-tools").innerHTML = (harness.tools || []).map(tool => `<span>${cp.icon("terminal")} ${esc(tool.replaceAll("_", " "))}</span>`).join("") || '<div class="empty-inline">No agent tools registered.</div>';
+    $("#admin-policy-table").innerHTML = (harness.policies || []).map(policy => `<tr><td class="mono">${esc(policy.action)}</td><td>${cp.badge(policy.risk)}</td><td>${policy.approval_required ? `${cp.icon("shieldCheck")} Required` : `${cp.icon("check")} Automatic`}</td></tr>`).join("") || '<tr><td colspan="3"><div class="empty-inline">No mutation policies registered.</div></td></tr>';
+  }
+  function setAdminTab(tab) {
+    state.adminTab = tab;
+    $$("[data-admin-tab]").forEach(node => node.classList.toggle("active", node.dataset.adminTab === tab));
+    $$("[data-admin-pane]").forEach(node => node.classList.toggle("active", node.dataset.adminPane === tab));
+  }
+
   async function loadSettings() {
     const [runtimes, observation] = await Promise.all([safe(() => cp.request("/runtimes"), []), safe(() => cp.request("/observation"), {})]);
     $("#runtime-grid").innerHTML = runtimes.map(runtime => `<article class="runtime-card"><p class="eyebrow">${esc(runtime.support)}</p><h3>${esc(runtime.name)}</h3>${cp.badge(runtime.available ? "available" : "not detected")}<p>${esc(runtime.detail || "No local runtime detail available.")}</p><div>${(runtime.capabilities || []).map(capability => `<span>${esc(capability)}</span>`).join("")}</div></article>`).join("") || '<div class="empty-state">No runtime capability data.</div>';
@@ -694,7 +983,7 @@
       const matchesQuery = !query || `${node.label} ${node.resource_type} ${JSON.stringify(node.attributes)}`.toLowerCase().includes(query);
       return matchesType && matchesQuery;
     }).sort((a, b) => resourcePriority(a) - resourcePriority(b) || a.label.localeCompare(b.label)).slice(0, 120);
-    $("#resource-picker-results").innerHTML = nodes.length ? nodes.map(node => `<button class="palette-result" data-inspect-type="${esc(node.resource_type)}" data-inspect-id="${esc(node.resource_id)}"><span class="inspector-resource-icon" style="width:28px;height:28px;flex-basis:28px;font-size:10px;background:${colors[node.resource_type] || "#aaa"}">${esc(resourceGlyph(node.resource_type))}</span><span><b>${esc(node.label)}</b><small>${esc(resourceContext(node))}</small></span><span class="picker-meta">${esc(node.status || node.resource_type.replaceAll("_", " "))}</span></button>`).join("") : '<div class="empty-inline">No live resource matches this filter.</div>';
+    $("#resource-picker-results").innerHTML = nodes.length ? nodes.map(node => `<button class="palette-result" data-inspect-type="${esc(node.resource_type)}" data-inspect-id="${esc(node.resource_id)}"><span class="inspector-resource-icon" style="width:28px;height:28px;flex-basis:28px;color:${colors[node.resource_type] || "#aaa"}">${resourceIcon(node.resource_type)}</span><span><b>${esc(node.label)}</b><small>${esc(resourceContext(node))}</small></span><span class="picker-meta">${esc(node.status || node.resource_type.replaceAll("_", " "))}</span></button>`).join("") : '<div class="empty-inline">No live resource matches this filter.</div>';
   }
 
   function resourcePriority(node) {
@@ -724,6 +1013,7 @@
 
   document.addEventListener("controlplane:view", event => {
     if (event.detail.view !== "activity") { window.clearTimeout(state.logTimer); window.clearTimeout(state.metricTimer); }
+    if (event.detail.view !== "admin") window.clearTimeout(state.adminTimer);
     loadControlView(event.detail.view);
   });
   document.addEventListener("click", async event => {
@@ -744,6 +1034,16 @@
       if (target.dataset.observeTab) setObserveTab(target.dataset.observeTab);
       if (target.dataset.topologyType) { const type = target.dataset.topologyType; state.topologyTypes.has(type) ? state.topologyTypes.delete(type) : state.topologyTypes.add(type); renderTopology(); }
       if (target.dataset.topologyZoom) zoomTopology(target.dataset.topologyZoom);
+      if (target.id === "topology-smart-filter") await applyIntelligentTopologyFilter();
+      if (target.id === "clear-smart-filter") clearIntelligentTopologyFilter();
+      if (target.id === "topology-layout-toggle") {
+        state.topologyLayout = state.topologyLayout === "flow" ? "radial" : "flow";
+        state.topologyPositions = new Map();
+        $("#topology-layout-label").textContent = state.topologyLayout === "flow" ? "Flow" : "Radial";
+        renderTopology({ fit: true });
+      }
+      if (target.dataset.openGraphResource) await openResource(target.dataset.openGraphResource, target.dataset.resourceId);
+      if (target.dataset.adminTab) setAdminTab(target.dataset.adminTab);
       if (target.dataset.pickerType) { state.resourcePickerType = target.dataset.pickerType; renderResourcePickerTypes(); renderResourcePicker(); }
       if (target.dataset.paletteAction === "topology") { closePalette(); cp.navigate("topology"); }
       if (target.dataset.paletteAction === "activity") { closePalette(); cp.navigate("activity"); }
@@ -775,7 +1075,16 @@
   });
   $("#workspace-search")?.addEventListener("input", renderWorkspaces);
   $("#process-search")?.addEventListener("input", renderProcesses);
-  $("#topology-search")?.addEventListener("input", renderTopology);
+  $("#topology-search")?.addEventListener("input", () => {
+    if (state.topologyFiltered) {
+      state.topologyFiltered = null; state.topologyFilterResult = null; state.topologyFilterQuery = "";
+      state.topologyPositions = new Map();
+      state.topologyTypes = new Set((state.topology?.nodes || []).map(node => node.resource_type));
+      updateSmartFilterStatus();
+    }
+    renderTopology();
+  });
+  $("#topology-search")?.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); applyIntelligentTopologyFilter(); } });
   $("#topology-project")?.addEventListener("change", loadTopology);
   $("#file-project")?.addEventListener("change", event => loadFiles(event.target.value));
   $("#file-search")?.addEventListener("input", renderFiles);
@@ -792,6 +1101,11 @@
   window.addEventListener("keydown", event => {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") { event.preventDefault(); openPalette(); }
     if (event.key === "Escape" && $("#resource-inspector").classList.contains("open")) closeInspector();
+    if ((location.hash.slice(1) || "overview") === "topology" && !event.target.matches("input, textarea, select")) {
+      if (["+", "="].includes(event.key)) { event.preventDefault(); zoomTopology("in"); }
+      if (event.key === "-") { event.preventDefault(); zoomTopology("out"); }
+      if (["0", "f", "F"].includes(event.key)) { event.preventDefault(); fitTopology(); }
+    }
   });
 
   startEvents();

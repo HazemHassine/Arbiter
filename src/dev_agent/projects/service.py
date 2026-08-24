@@ -44,7 +44,7 @@ class ProjectService:
             return ProjectRepository(session).save(discovered)
 
     def scan(self) -> list[Project]:
-        found = discover_projects(self.settings.project_roots)
+        found = discover_projects(self.settings.project_roots, self.settings.project_scan_depth)
         with self.database.sessions() as session:
             repository = ProjectRepository(session)
             return [repository.save(item) for item in found]

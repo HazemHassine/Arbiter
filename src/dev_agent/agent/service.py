@@ -279,6 +279,7 @@ class AgentService:
             settings.llm_api_key,
             settings.llm_model,
             reasoning_effort=settings.llm_reasoning_effort,
+            telemetry=self.services.telemetry,
         )
         try:
             outcome = await AgentLoop(provider, AgentTools(self), settings.agent_max_steps).run(message)

@@ -11,6 +11,7 @@ from dev_agent.ports.service import PortService
 from dev_agent.projects.service import ProjectService
 from dev_agent.runtimes.service import RuntimeService
 from dev_agent.system.service import SystemService
+from dev_agent.telemetry import TelemetryRegistry
 from dev_agent.topology.service import TopologyService
 
 
@@ -28,6 +29,7 @@ class Services:
     impact: ImpactService
     runtimes: RuntimeService
     events: EventBus
+    telemetry: TelemetryRegistry
     observer: ObservationService | None = None
 
 
@@ -60,6 +62,7 @@ def build_services(settings: Settings, docker: DockerService | None = None, scan
         impact,
         RuntimeService(docker_service),
         EventBus(),
+        TelemetryRegistry(),
     )
     services.observer = ObservationService(services, services.events, settings.observation_interval_seconds)
     return services

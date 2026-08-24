@@ -1,6 +1,6 @@
 [project]
 name = "local-dev-agent"
-version = "0.2.0"
+version = "0.3.0"
 description = "Safe local development environment and port coordination agent"
 readme = "README.md"
 requires-python = ">=3.12"

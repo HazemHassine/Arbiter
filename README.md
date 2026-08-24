@@ -16,18 +16,24 @@ curl http://127.0.0.1:8765/api/v1/ports
 ```
 
 Open [http://127.0.0.1:8765](http://127.0.0.1:8765) for the control panel. It
-uses a deployment-dashboard-style interface with a global live-resource picker,
-connected topology, workspace screens, process evidence, and an observability
-console for SSE events, auto-refreshing container logs and metrics, and embedded
-localhost previews. Docker resources, command search, port tracing, and the
-approval-protected project file editor remain available in the same shell. The UI
-is bundled locally with no frontend build step or external runtime assets, and
-uses the same REST safety pipeline as the CLI.
+uses a compact product-console interface with a global live-resource picker, an
+interactive topology canvas, workspace screens, process evidence, and an
+observability console for SSE events, auto-refreshing container logs and metrics,
+and embedded localhost previews. The Admin page adds rolling API latency, LLM
+usage, event pipeline, process/database, agent-harness, and safety-policy views
+alongside an operational handbook. Docker resources, command search, port
+tracing, and the approval-protected project file editor remain available in the
+same shell. The UI is bundled locally with no frontend build step or external
+runtime assets, including a locally vendored Lucide icon subset, and uses the
+same REST safety pipeline as the CLI.
 
 ## What it observes
 
 - A fresh topology graph links projects, Compose files/services, containers,
   images, volumes, networks, ports, host processes, Dockerfiles, and Make targets.
+- The topology canvas supports pointer-centered wheel zoom, canvas panning,
+  draggable nodes, fit-to-view, flow/radial layouts, connected-path focus, and
+  strict natural-language resource filtering.
 - Runtime-driven discovery creates ephemeral workspace evidence from Compose
   labels and process working directories; explicit registration remains required
   before a project can be edited.
@@ -39,6 +45,9 @@ uses the same REST safety pipeline as the CLI.
   and are never persisted by the control plane.
 - Dockerfile and Makefile inspection provide deterministic metadata and
   conservative diagnostics; the LLM layer only sits above typed read-only tools.
+- Optional resource-query interpretation uses `FILTER_LLM_MODEL` (default
+  `gpt-5.4-nano`) to produce a strict typed filter plan. Matching is still local
+  and deterministic, and automatically falls back to the built-in parser.
 
 Register and prepare a project:
 

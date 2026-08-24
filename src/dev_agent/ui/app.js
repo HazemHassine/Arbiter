@@ -19,6 +19,7 @@ const fmtBytes = value => {
 };
 const statusClass = value => String(value || "unknown").toLowerCase().replaceAll(" ", "_");
 const badge = value => `<span class="badge ${statusClass(value)}">${esc(value || "unknown")}</span>`;
+const icon = (name, className = "") => window.iconPack?.icon(name, className) || "";
 
 async function request(path, options = {}) {
   const config = { ...options, headers: { ...(options.body ? { "Content-Type": "application/json" } : {}), ...options.headers } };
@@ -419,6 +420,6 @@ async function boot() {
 boot();
 
 window.controlPlane = {
-  $, $$, API, state, esc, fmtBytes, badge, request, toast, showDialog,
+  $, $$, API, state, esc, fmtBytes, badge, icon, request, toast, showDialog,
   navigate, loadView, refreshCounts, handleOperation,
 };
