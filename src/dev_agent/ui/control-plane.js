@@ -201,7 +201,10 @@
   async function loadTopology() {
     await loadProjects();
     const selector = $("#topology-project");
-    if (!state.topologyInitialized && !selector.value && cp.state.projects.length) selector.value = cp.state.projects[0].id;
+    if (!state.topologyInitialized && !selector.value && cp.state.projects.length) {
+      const richest = [...cp.state.projects].sort((a, b) => topologyProjectScore(b) - topologyProjectScore(a))[0];
+      if (topologyProjectScore(richest) > 0) selector.value = richest.id;
+    }
     state.topologyInitialized = true;
     const project = selector.value;
     const path = project ? `/topology/project/${encodeURIComponent(project)}` : "/topology";
@@ -217,7 +220,10 @@
     state.topologyTypes = new Set(graph.nodes.map(node => node.resource_type));
     updateSmartFilterStatus();
     renderTopology({ fit: true });
+    cp.setSynced();
   }
+
+  const topologyProjectScore = project => (project.services?.length || 0) * 4 + (project.ports?.length || 0) * 3 + (project.compose_files?.length || 0) * 2 + (project.dockerfiles?.length || 0);
 
   function renderTopology(options = {}) {
     const graph = state.topologyFiltered || state.topology;
@@ -845,6 +851,7 @@
     if (!data) { $("#admin-refresh-status").textContent = "Unavailable"; return; }
     state.adminData = data;
     renderAdmin(data);
+    cp.setSynced();
     $("#admin-refresh-status").textContent = `Updated ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
     if ((location.hash.slice(1) || "overview") === "admin") state.adminTimer = window.setTimeout(loadAdmin, 5000);
   }

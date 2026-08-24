@@ -414,12 +414,13 @@ async function boot() {
     $(".pulse").classList.add("offline"); $("#daemon-label").textContent = "Agent unavailable";
     $("#daemon-detail").textContent = error.message;
   }
+  if ((location.hash.slice(1) || "overview") !== "overview") await refreshCounts();
   navigate(location.hash.slice(1) || "overview");
 }
 
 boot();
 
 window.controlPlane = {
-  $, $$, API, state, esc, fmtBytes, badge, icon, request, toast, showDialog,
+  $, $$, API, state, esc, fmtBytes, badge, icon, request, toast, showDialog, setSynced,
   navigate, loadView, refreshCounts, handleOperation,
 };

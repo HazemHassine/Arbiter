@@ -18,6 +18,9 @@ def test_health_port_project_and_docker_apis(service_factory, tmp_path):
         assert 'id="resource-selector"' in ui.text
         assert 'id="container-log-output"' in ui.text
         assert 'id="preview-frame"' in ui.text
+        assert 'id="view-admin"' in ui.text
+        assert 'src="/ui/icons.js"' in ui.text
+        assert client.get("/ui/icons.js").status_code == 200
         assert client.get("/api/v1/ports/5432").json()["process"] == "postgres"
         project = tmp_path / "api-demo"
         project.mkdir()
