@@ -127,6 +127,67 @@ class AgentService:
     def query(self, message: str) -> dict[str, object]:
         request_id = str(uuid4())
         lower = message.lower()
+        if any(phrase in lower for phrase in ("what is running", "which projects are running", "running projects")):
+            workspaces = []
+            for project in self.services.projects.list_projects():
+                workspace = self.services.topology.workspace(project.id)
+                if workspace["status"] in {"running", "partially_running"}:
+                    workspaces.append(
+                        {"project": project.name, "status": workspace["status"], "summary": workspace["summary"]}
+                    )
+            return self._persist_request(
+                message,
+                {
+                    "request_id": request_id,
+                    "status": "completed",
+                    "message": f"Found {len(workspaces)} registered project(s) with observed runtime activity.",
+                    "observations": workspaces,
+                    "actions": [],
+                    "approval_required": False,
+                },
+            )
+        if "what would break" in lower or "impact" in lower and "container" in lower:
+            containers = self.services.docker.list_containers()
+            matches = [item for item in containers if item.name.lower() in lower or item.id[:12].lower() in lower]
+            if len(matches) == 1:
+                impact = self.services.impact.analyze(
+                    ActionSpec(
+                        action="container.stop",
+                        arguments={"identifier": matches[0].id},
+                        summary=f"Impact of stopping {matches[0].name}",
+                        risk=Risk.MEDIUM_RISK,
+                    )
+                )
+                return self._persist_request(
+                    message,
+                    {
+                        "request_id": request_id,
+                        "status": "completed",
+                        "message": impact["summary"],
+                        "observations": [impact],
+                        "actions": [],
+                        "approval_required": False,
+                    },
+                )
+        if "process" in lower and any(word in lower for word in ("running", "list", "show", "which")):
+            owners = self.services.ports.list_used_ports()
+            by_pid: dict[int, list[int]] = {}
+            for owner in owners:
+                if owner.pid:
+                    by_pid.setdefault(owner.pid, []).append(owner.port)
+            processes = self.services.system.processes(by_pid)
+            interesting = [item for item in processes if item.get("kind") != "process" or item.get("ports")]
+            return self._persist_request(
+                message,
+                {
+                    "request_id": request_id,
+                    "status": "completed",
+                    "message": f"Found {len(interesting)} development-related or listening process(es).",
+                    "observations": interesting,
+                    "actions": [],
+                    "approval_required": False,
+                },
+            )
         if any(word in lower for word in ("prepare", "start")):
             matches = [project for project in self.services.projects.list_projects() if project.name.lower() in lower]
             if len(matches) == 1:

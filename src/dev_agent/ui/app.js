@@ -162,8 +162,8 @@ function renderPorts() {
     <td class="mono">${esc(item.protocol.toUpperCase())}</td>
     <td><span class="cell-main">${esc(item.container || item.process || "Unknown")}</span><span class="cell-sub">${item.pid ? `PID ${esc(item.pid)}` : esc(shortId(item.container_id))}</span></td>
     <td><span class="cell-main">${esc(item.project || "—")}</span><span class="cell-sub">${esc(item.service || "unassigned")}</span></td>
-    <td class="muted">${esc(item.source ? item.source.split("/").pop() : "runtime")}</td><td>${badge(item.state)}</td></tr>`).join("")
-    : '<tr><td colspan="6"><div class="empty-state">No ports match this filter.</div></td></tr>';
+    <td class="muted">${esc(item.source ? item.source.split("/").pop() : "runtime")}</td><td>${badge(item.state)}</td><td><button class="mini-button" data-inspect-type="port" data-inspect-id="${esc(`${item.protocol}:${item.port}`)}">Trace</button></td></tr>`).join("")
+    : '<tr><td colspan="7"><div class="empty-state">No ports match this filter.</div></td></tr>';
 }
 
 async function findFreePorts() {
@@ -278,13 +278,17 @@ function renderDockerList(tab, data) {
   if (!data.length) { target.innerHTML = `<div class="panel empty-state">No ${esc(tab)} found.</div>`; return; }
   const columns = {
     images: ["Identifier", "Tags", "Size", "Used", ""],
-    volumes: ["Name", "Driver", "Mountpoint", "Users", ""],
+    volumes: ["Name", "Driver", "Mountpoint", "Size", "Users", ""],
     networks: ["Name", "Driver", "Scope", "Members", ""],
   }[tab];
   const rows = data.map(item => {
-    if (tab === "images") return `<tr><td class="mono">${esc(shortId(item.id))}</td><td>${esc(item.tags?.join(", ") || "untagged")}</td><td>${fmtBytes(item.size)}</td><td>${badge(item.used ? "used" : "unused")}</td><td>${item.used ? "" : `<button class="mini-button" data-docker-remove="images" data-id="${esc(item.id)}">Remove</button>`}</td></tr>`;
-    if (tab === "volumes") return `<tr><td class="mono">${esc(item.name)}</td><td>${esc(item.driver)}</td><td class="muted">${esc(item.mountpoint)}</td><td>${esc(item.users?.join(", ") || "None")}</td><td>${item.users?.length ? "" : `<button class="mini-button" data-docker-remove="volumes" data-id="${esc(item.name)}">Remove</button>`}</td></tr>`;
-    return `<tr><td>${esc(item.name)}</td><td>${esc(item.driver)}</td><td>${esc(item.scope)}</td><td>${esc(item.members?.join(", ") || "None")}</td><td><button class="mini-button" data-network-inspect="${esc(item.id)}">Inspect</button></td></tr>`;
+    if (tab === "images") return `<tr><td class="mono">${esc(shortId(item.id))}</td><td>${esc(item.tags?.join(", ") || "untagged")}</td><td>${fmtBytes(item.size)}</td><td>${badge(item.used ? "used" : "unused")}</td><td><button class="mini-button" data-inspect-type="image" data-inspect-id="${esc(item.id)}">Inspect</button>${item.used ? "" : `<button class="mini-button" data-docker-remove="images" data-id="${esc(item.id)}">Remove</button>`}</td></tr>`;
+    if (tab === "volumes") {
+      const users = item.users?.map(user => typeof user === "string" ? user : `${user.name} → ${user.destination || "?"}`).join(", ");
+      return `<tr><td class="mono">${esc(item.name)}</td><td>${esc(item.driver)}</td><td class="muted">${esc(item.mountpoint)}</td><td>${fmtBytes(item.size)}</td><td>${esc(users || "None")}</td><td><button class="mini-button" data-inspect-type="volume" data-inspect-id="${esc(item.name)}">Inspect</button>${item.users?.length ? "" : `<button class="mini-button" data-docker-remove="volumes" data-id="${esc(item.name)}">Remove</button>`}</td></tr>`;
+    }
+    const members = item.members?.map(member => typeof member === "string" ? member : member.name).join(", ");
+    return `<tr><td>${esc(item.name)}</td><td>${esc(item.driver)}</td><td>${esc(item.scope)}</td><td>${esc(members || "None")}</td><td><button class="mini-button" data-inspect-type="network" data-inspect-id="${esc(item.id || item.name)}">Inspect</button></td></tr>`;
   }).join("");
   target.innerHTML = `<article class="panel table-panel"><div class="table-wrap"><table><thead><tr>${columns.map(c => `<th>${c}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div></article>`;
 }
@@ -350,6 +354,7 @@ async function askAgent(message) {
 async function loadView(view) {
   const loaders = { overview: loadOverview, ports: loadPorts, projects: loadProjects, containers: loadContainers, docker: loadDocker, approvals: loadApprovals, history: loadHistory };
   if (loaders[view]) await loaders[view]();
+  document.dispatchEvent(new CustomEvent("controlplane:view", { detail: { view } }));
 }
 
 document.addEventListener("click", async event => {
@@ -412,3 +417,8 @@ async function boot() {
 }
 
 boot();
+
+window.controlPlane = {
+  $, $$, API, state, esc, fmtBytes, badge, request, toast, showDialog,
+  navigate, loadView, refreshCounts, handleOperation,
+};

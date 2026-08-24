@@ -5,6 +5,8 @@ from uuid import uuid4
 from dev_agent.compose.editor import ComposeEditor, change_env_port
 from dev_agent.compose.service import ComposeService
 from dev_agent.docker.service import DockerService
+from dev_agent.files.service import FileService
+from dev_agent.impact.service import ImpactService
 from dev_agent.make.service import MakeService
 from dev_agent.models import ActionResult, ActionSpec
 from dev_agent.persistence.database import Database
@@ -13,11 +15,20 @@ from dev_agent.ports.service import PortService
 from dev_agent.projects.service import ProjectService
 from dev_agent.safety.approvals import ApprovalService
 from dev_agent.safety.policies import needs_approval
+from dev_agent.security import redact_action_arguments
 
 
 class ActionService:
     def __init__(
-        self, database: Database, projects: ProjectService, ports: PortService, docker: DockerService, settings
+        self,
+        database: Database,
+        projects: ProjectService,
+        ports: PortService,
+        docker: DockerService,
+        settings,
+        *,
+        files: FileService | None = None,
+        impact: ImpactService | None = None,
     ) -> None:
         self.database, self.projects, self.ports, self.docker = database, projects, ports, docker
         self.settings = settings
@@ -25,12 +36,23 @@ class ActionService:
         self.compose = ComposeService()
         self.editor = ComposeEditor()
         self.make = MakeService()
+        self.files = files
+        self.impact = impact
 
     def propose(self, spec: ActionSpec) -> dict[str, object]:
+        impact = self.impact.analyze(spec) if self.impact else None
         if needs_approval(spec.risk, self.settings):
             approval = self.approvals.create(spec)
-            return {"status": "approval_required", "approval": approval.model_dump(mode="json")}
-        return {"status": "completed", "action": self.execute(spec).model_dump(mode="json")}
+            public_approval = approval.model_dump(mode="json")
+            public_approval["arguments"] = redact_action_arguments(approval.action, approval.arguments)
+            response: dict[str, object] = {"status": "approval_required", "approval": public_approval}
+            if impact:
+                response["impact"] = impact
+            return response
+        response = {"status": "completed", "action": self.execute(spec).model_dump(mode="json")}
+        if impact:
+            response["impact"] = impact
+        return response
 
     def approve_and_execute(self, approval_id: str) -> ActionResult:
         approval = self.approvals.decide(approval_id, True)
@@ -62,7 +84,7 @@ class ActionService:
             session.add(row)
             session.commit()
         try:
-            result, verification = self._dispatch(spec)
+            result, verification = self._dispatch(spec, action_id)
             status = "completed" if verification.get("verified") else "verification_failed"
             response = ActionResult(
                 id=action_id, action=spec.action, status=status, result=result, verification=verification
@@ -78,7 +100,7 @@ class ActionService:
             session.commit()
         return response
 
-    def _dispatch(self, spec: ActionSpec) -> tuple[dict, dict]:
+    def _dispatch(self, spec: ActionSpec, action_id: str) -> tuple[dict, dict]:
         args = spec.arguments
         if spec.action.startswith("container."):
             result = self.docker.container_action(args["identifier"], spec.action.split(".", 1)[1])
@@ -107,6 +129,18 @@ class ActionService:
                 if item.compose_working_dir == str(project.path) and item.compose_service == args["service"]
             ]
             return result, {"verified": bool(containers) and all(item.state == "running" for item in containers)}
+        if spec.action == "compose.change_port":
+            project, compose_file = self._project_compose(args["project_id"])
+            result = self.editor.change_service_host_port(
+                compose_file, args["service"], int(args["old_port"]), int(args["new_port"])
+            )
+            self.compose.recreate_service(compose_file, args["service"])
+            owner = self.ports.find_port_owner(int(args["new_port"]))
+            return result, {
+                "verified": bool(owner),
+                "project": project.name,
+                "new_port_owner": owner.model_dump(mode="json") if owner else None,
+            }
         if spec.action == "project.resolve_ports":
             project, compose_file = self._project_compose(args["project_id"])
             changes = []
@@ -153,6 +187,16 @@ class ActionService:
             project = self.projects.get_project(args["project_id"])
             result = self.make.run(project.path, args["target"])
             return result, {"verified": result["verified"]}
+        if spec.action == "file.update":
+            if not self.files:
+                raise RuntimeError("Project file editing service is unavailable")
+            result = self.files.apply_update(args["project_id"], args["path"], args["content"], args["expected_sha256"])
+            return result, {"verified": bool(result.get("verified")), "validation": result.get("validation", {})}
+        if spec.action == "file.undo":
+            if not self.files:
+                raise RuntimeError("Project file editing service is unavailable")
+            result = self.files.undo_latest(args["project_id"], args["path"])
+            return result, {"verified": bool(result.get("verified")), "validation": result.get("validation", {})}
         if spec.action == "image.remove":
             result = self.docker.remove_image(args["identifier"])
             return result, {"verified": result["verified"]}

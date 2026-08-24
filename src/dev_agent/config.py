@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     default_port_search_range_start: int = 3000
     default_port_search_range_end: int = 9999
     subprocess_timeout: float = 30.0
+    observation_interval_seconds: float = 3.0
 
     @field_validator("project_roots", mode="before")
     @classmethod

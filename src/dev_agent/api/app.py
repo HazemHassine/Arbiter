@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -15,6 +15,7 @@ from dev_agent.integrations.a2a.server import AGENT_CARD
 from dev_agent.make.service import MakeService
 from dev_agent.models import ActionSpec, Risk
 from dev_agent.persistence.tables import ActionRow
+from dev_agent.security import redact_action_arguments
 from dev_agent.services import Services, build_services
 
 
@@ -37,6 +38,29 @@ class PortSuggestion(BaseModel):
     preferred_port: int = Field(ge=1, le=65535)
 
 
+class FileChangeRequest(BaseModel):
+    path: str = Field(min_length=1, max_length=512)
+    content: str = Field(max_length=1_000_000)
+    expected_sha256: str = Field(min_length=64, max_length=64)
+
+
+class FileUndoRequest(BaseModel):
+    path: str = Field(min_length=1, max_length=512)
+
+
+class ComposePortChange(BaseModel):
+    service: str = Field(min_length=1, max_length=255)
+    old_port: int = Field(ge=1, le=65535)
+    new_port: int = Field(ge=1, le=65535)
+
+
+class ImpactRequest(BaseModel):
+    action: str = Field(min_length=1, max_length=128)
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    risk: Risk = Risk.MEDIUM_RISK
+    project_id: str | None = None
+
+
 def create_app(settings: Settings | None = None, services: Services | None = None) -> FastAPI:
     configured = settings or get_settings()
     service_container = services or build_services(configured)
@@ -44,9 +68,15 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         service_container.database.create_all()
-        yield
+        if service_container.observer:
+            await service_container.observer.start()
+        try:
+            yield
+        finally:
+            if service_container.observer:
+                await service_container.observer.stop()
 
-    app = FastAPI(title="Local Development Environment Agent", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="Local Developer Control Plane", version="0.2.0", lifespan=lifespan)
     app.state.services = service_container
 
     @app.exception_handler(LookupError)
@@ -69,7 +99,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
 
     @app.get("/health")
     def health() -> dict[str, str]:
-        return {"status": "ok", "version": "0.1.0"}
+        return {"status": "ok", "version": "0.2.0"}
 
     @app.get("/.well-known/agent-card.json")
     def agent_card() -> dict[str, Any]:
@@ -112,6 +142,44 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
         owner = services.ports.find_port_owner(port)
         return owner.model_dump(mode="json") if owner else {"port": port, "available": True}
 
+    @router.get("/topology")
+    def topology(services: Dep, project: str | None = None) -> dict[str, Any]:
+        return services.topology.graph(project).model_dump(mode="json")
+
+    @router.get("/topology/project/{identifier}")
+    def project_topology(identifier: str, services: Dep) -> dict[str, Any]:
+        return services.topology.project_graph(identifier).model_dump(mode="json")
+
+    @router.get("/resources/{resource_type}/{resource_id:path}")
+    def resource_inspection(resource_type: str, resource_id: str, services: Dep) -> dict[str, Any]:
+        return services.topology.inspect_resource(resource_type, resource_id).model_dump(mode="json")
+
+    @router.get("/search")
+    def search_resources(
+        services: Dep, q: str = Query(min_length=1, max_length=200), limit: int = Query(30, ge=1, le=100)
+    ) -> list[dict[str, Any]]:
+        return services.topology.search(q, limit)
+
+    @router.get("/runtimes")
+    def runtimes(services: Dep) -> list[dict[str, Any]]:
+        return [item.model_dump(mode="json") for item in services.runtimes.list_capabilities()]
+
+    @router.get("/activity")
+    def activity(services: Dep, limit: int = Query(100, ge=1, le=250)) -> list[dict[str, Any]]:
+        return [item.model_dump(mode="json") for item in services.events.recent(limit)]
+
+    @router.get("/events/stream")
+    async def event_stream(services: Dep) -> StreamingResponse:
+        return StreamingResponse(
+            services.events.stream(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
+    @router.get("/observation")
+    def observation_status(services: Dep) -> dict[str, Any]:
+        return services.observer.status() if services.observer else {"running": False}
+
     @router.get("/projects")
     def projects(services: Dep) -> list[dict[str, Any]]:
         return [item.model_dump(mode="json") for item in services.projects.list_projects()]
@@ -131,6 +199,62 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
         return AgentService(services).prepare_project(
             path=body.path, resolve_port_conflicts=body.resolve_port_conflicts, start=body.start, verify=body.verify
         )
+
+    @router.get("/projects/{identifier}/workspace")
+    def workspace(identifier: str, services: Dep) -> dict[str, Any]:
+        return services.topology.workspace(identifier)
+
+    @router.get("/projects/{identifier}/files")
+    def project_files(identifier: str, services: Dep) -> list[dict[str, Any]]:
+        project = services.projects.get_project(identifier)
+        return [item.model_dump(mode="json") for item in services.files.list_files(project.id)]
+
+    @router.get("/projects/{identifier}/files/content")
+    def project_file(identifier: str, services: Dep, path: str = Query(min_length=1)) -> dict[str, Any]:
+        project = services.projects.get_project(identifier)
+        return services.files.read(project.id, path).model_dump(mode="json")
+
+    @router.post("/projects/{identifier}/files/preview")
+    def preview_file_change(identifier: str, body: FileChangeRequest, services: Dep) -> dict[str, Any]:
+        project = services.projects.get_project(identifier)
+        return services.files.preview(project.id, body.path, body.content, body.expected_sha256).model_dump(mode="json")
+
+    @router.post("/projects/{identifier}/files/save")
+    def save_file_change(identifier: str, body: FileChangeRequest, services: Dep) -> dict[str, Any]:
+        project = services.projects.get_project(identifier)
+        preview = services.files.preview(project.id, body.path, body.content, body.expected_sha256)
+        spec = ActionSpec(
+            action="file.update",
+            risk=Risk.MEDIUM_RISK,
+            project_id=project.id,
+            summary=f"Apply reviewed edit to {project.name}/{preview.path}",
+            arguments={
+                "project_id": project.id,
+                "path": preview.path,
+                "content": body.content,
+                "expected_sha256": body.expected_sha256,
+            },
+        )
+        return {"preview": preview.model_dump(mode="json"), **services.actions.propose(spec)}
+
+    @router.post("/projects/{identifier}/files/undo")
+    def undo_file_change(identifier: str, body: FileUndoRequest, services: Dep) -> dict[str, Any]:
+        project = services.projects.get_project(identifier)
+        # Resolving the file now prevents approvals for paths outside the project.
+        services.files.read(project.id, body.path)
+        spec = ActionSpec(
+            action="file.undo",
+            risk=Risk.MEDIUM_RISK,
+            project_id=project.id,
+            summary=f"Undo the last managed edit to {project.name}/{body.path}",
+            arguments={"project_id": project.id, "path": body.path},
+        )
+        return services.actions.propose(spec)
+
+    @router.get("/projects/{identifier}/dockerfiles")
+    def dockerfiles(identifier: str, services: Dep) -> list[dict[str, Any]]:
+        project = services.projects.refresh_project(identifier)
+        return [services.topology.dockerfiles.inspect(path).model_dump(mode="json") for path in project.dockerfiles]
 
     @router.get("/projects/{identifier}")
     def project(identifier: str, services: Dep) -> dict[str, Any]:
@@ -205,11 +329,8 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     def make_targets(identifier: str, services: Dep) -> list[dict[str, object]]:
         project = services.projects.get_project(identifier)
         service = MakeService()
-        targets = service.parse(project.path / "Makefile")
-        return [
-            {"target": name, "commands": commands, "risk": service.classify(name, commands)}
-            for name, commands in targets.items()
-        ]
+        targets = service.parse_details(project.path / "Makefile")
+        return [{"target": name, **item.model_dump(mode="json")} for name, item in targets.items()]
 
     @router.get("/projects/{identifier}/make/targets/{target}")
     def make_target(identifier: str, target: str, services: Dep) -> dict[str, object]:
@@ -355,13 +476,37 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
         )
         return services.actions.propose(spec)
 
+    @router.post("/compose/projects/{identifier}/services/port")
+    def change_compose_port(identifier: str, body: ComposePortChange, services: Dep) -> dict[str, object]:
+        project = services.projects.get_project(identifier)
+        spec = ActionSpec(
+            action="compose.change_port",
+            risk=Risk.MEDIUM_RISK,
+            project_id=project.id,
+            summary=f"Change {project.name}/{body.service} host port from {body.old_port} to {body.new_port}",
+            arguments={"project_id": project.id, **body.model_dump(mode="json")},
+        )
+        return services.actions.propose(spec)
+
+    @router.post("/impact")
+    def impact(body: ImpactRequest, services: Dep) -> dict[str, Any]:
+        return services.impact.analyze(
+            ActionSpec(
+                action=body.action,
+                arguments=body.arguments,
+                risk=body.risk,
+                project_id=body.project_id,
+                summary=f"Impact analysis for {body.action}",
+            )
+        )
+
     @router.get("/approvals")
     def approvals(services: Dep) -> list[dict[str, Any]]:
-        return [item.model_dump(mode="json") for item in services.actions.approvals.list()]
+        return [_public_approval(item) for item in services.actions.approvals.list()]
 
     @router.get("/approvals/{approval_id}")
     def approval(approval_id: str, services: Dep) -> dict[str, Any]:
-        return services.actions.approvals.get(approval_id).model_dump(mode="json")
+        return _public_approval(services.actions.approvals.get(approval_id))
 
     @router.post("/approvals/{approval_id}/approve")
     def approve(approval_id: str, services: Dep) -> dict[str, Any]:
@@ -381,7 +526,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
                     "request_id": row.request_id,
                     "project_id": row.project_id,
                     "action": row.action,
-                    "arguments": row.arguments,
+                    "arguments": redact_action_arguments(row.action, row.arguments),
                     "risk": row.risk,
                     "approval_id": row.approval_id,
                     "status": row.status,
@@ -400,6 +545,20 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     def process(pid: int, services: Dep) -> dict[str, object]:
         return services.system.process(pid)
 
+    @router.get("/processes")
+    def processes(services: Dep) -> list[dict[str, object]]:
+        owners = services.ports.list_used_ports()
+        port_by_pid: dict[int, list[int]] = {}
+        for owner in owners:
+            if owner.pid:
+                port_by_pid.setdefault(owner.pid, []).append(owner.port)
+        return services.system.processes(port_by_pid)
+
+    @router.get("/processes/{pid}")
+    def detailed_process(pid: int, services: Dep) -> dict[str, object]:
+        owners = services.ports.list_used_ports()
+        return services.system.process(pid, [owner.port for owner in owners if owner.pid == pid])
+
     @router.get("/system/ports")
     def system_ports(services: Dep) -> list[dict[str, Any]]:
         return [item.model_dump(mode="json") for item in services.ports.scanner.scan()]
@@ -408,6 +567,12 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     ui_directory = Path(__file__).resolve().parent.parent / "ui"
     app.mount("/ui", StaticFiles(directory=ui_directory, html=True), name="control-panel")
     return app
+
+
+def _public_approval(approval) -> dict[str, Any]:
+    result = approval.model_dump(mode="json")
+    result["arguments"] = redact_action_arguments(approval.action, approval.arguments)
+    return result
 
 
 app = create_app()

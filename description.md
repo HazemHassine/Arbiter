@@ -7,6 +7,10 @@ understanding and controlling a developer workstation. Its primary purpose is to
 coordinate ports across many simultaneously running projects, Docker containers,
 Docker Compose stacks, and local processes.
 
+The current control-plane layer also renders those resources as a live connected
+topology, streams activity over SSE, provides safe registered-project
+configuration editing, and exposes Dockerfile/Makefile intelligence.
+
 The application behaves like a small development-focused SRE operator. It gathers
 evidence from the machine, explains what it found, proposes narrowly scoped
 changes, requires approval according to risk, executes the approved operation, and

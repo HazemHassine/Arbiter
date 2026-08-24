@@ -13,7 +13,7 @@ def create_server():
 
     services = build_services(get_settings())
     agent = AgentService(services)
-    server = MCPServer("local-dev-environment", version="0.1.0")
+    server = MCPServer("local-dev-environment", version="0.2.0")
 
     @server.tool(name="ports_list")
     def ports_list() -> list[dict]:
@@ -50,6 +50,26 @@ def create_server():
     def docker_list_containers() -> list[dict]:
         """List local Docker containers with Compose metadata."""
         return [item.model_dump(mode="json") for item in services.docker.list_containers()]
+
+    @server.tool(name="topology_get")
+    def topology_get() -> dict:
+        """Get the connected, freshly observed workstation resource topology."""
+        return services.topology.graph().model_dump(mode="json")
+
+    @server.tool(name="resource_inspect")
+    def resource_inspect(resource_type: str, resource_id: str) -> dict:
+        """Inspect a resource and its direct topology relationships."""
+        return services.topology.inspect_resource(resource_type, resource_id).model_dump(mode="json")
+
+    @server.tool(name="processes_list")
+    def processes_list() -> list[dict]:
+        """List host processes with listening-port and heuristic runtime evidence."""
+        owners = services.ports.list_used_ports()
+        by_pid: dict[int, list[int]] = {}
+        for owner in owners:
+            if owner.pid:
+                by_pid.setdefault(owner.pid, []).append(owner.port)
+        return services.system.processes(by_pid)
 
     return server
 

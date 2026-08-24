@@ -1,4 +1,5 @@
 import re
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -22,3 +23,16 @@ def safe_project_path(path: Path, roots: list[Path] | None = None) -> Path:
         if not any(resolved == root or resolved.is_relative_to(root) for root in allowed):
             raise ValueError(f"Path is outside configured project roots: {resolved}")
     return resolved
+
+
+def redact_action_arguments(action: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    """Hide editor payloads that could contain an environment secret from list APIs.
+
+    The immutable stored action remains available to the action dispatcher, while
+    API consumers receive the diff preview and a stable hash instead of an
+    accidental copy of a full ``.env`` file.
+    """
+    result = deepcopy(arguments)
+    if action == "file.update" and Path(str(result.get("path", ""))).name == ".env" and "content" in result:
+        result["content"] = "<redacted .env editor payload>"
+    return result

@@ -53,6 +53,7 @@ class Project(BaseModel):
     has_makefile: bool = False
     has_env: bool = False
     has_dockerfile: bool = False
+    dockerfiles: list[Path] = Field(default_factory=list)
     ports: list[PortBinding] = Field(default_factory=list)
     services: list[str] = Field(default_factory=list)
     status: str = "discovered"
@@ -68,12 +69,15 @@ class ContainerInfo(BaseModel):
     health: str | None = None
     restart_count: int = 0
     ports: list[PortBinding] = Field(default_factory=list)
+    exposed_ports: list[PortBinding] = Field(default_factory=list)
     mounts: list[dict[str, Any]] = Field(default_factory=list)
     networks: list[str] = Field(default_factory=list)
     labels: dict[str, str] = Field(default_factory=dict)
     compose_project: str | None = None
     compose_service: str | None = None
     compose_working_dir: str | None = None
+    created: str | None = None
+    command: list[str] = Field(default_factory=list)
 
 
 class ActionSpec(BaseModel):

@@ -89,6 +89,30 @@ def containers() -> None:
 
 
 @app.command()
+def topology(project: str | None = None) -> None:
+    """Show the connected, freshly observed workstation topology."""
+    emit(services().topology.graph(project).model_dump(mode="json"))
+
+
+@app.command()
+def processes() -> None:
+    """List host processes with port and development-runtime evidence."""
+    svc = services()
+    owners = svc.ports.list_used_ports()
+    by_pid: dict[int, list[int]] = {}
+    for owner in owners:
+        if owner.pid:
+            by_pid.setdefault(owner.pid, []).append(owner.port)
+    emit(svc.system.processes(by_pid))
+
+
+@app.command()
+def runtimes() -> None:
+    """Report detected container runtime capabilities."""
+    emit([item.model_dump(mode="json") for item in services().runtimes.list_capabilities()])
+
+
+@app.command()
 def logs(identifier: str, tail: int = 200) -> None:
     """Read bounded container logs."""
     typer.echo(services().docker.logs(identifier, tail))

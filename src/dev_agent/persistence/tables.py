@@ -52,3 +52,15 @@ class AgentRequestRow(Base):
     status: Mapped[str] = mapped_column(String(32))
     response: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ManagedFileBackupRow(Base):
+    __tablename__ = "managed_file_backups"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    project_id: Mapped[str] = mapped_column(String(36), index=True)
+    relative_path: Mapped[str] = mapped_column(Text)
+    backup_path: Mapped[str] = mapped_column(Text)
+    before_sha256: Mapped[str] = mapped_column(String(64))
+    after_sha256: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    undone_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

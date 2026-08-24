@@ -72,3 +72,53 @@ def inspect_compose(path: Path) -> tuple[list[str], list[PortBinding]]:
                 binding.source = str(path)
                 bindings.append(binding)
     return list(services), bindings
+
+
+def inspect_compose_details(path: Path) -> dict[str, dict[str, Any]]:
+    """Return the topology-relevant, non-executing subset of a Compose file.
+
+    The result intentionally keeps unknown Compose fields out of the domain layer.
+    It is evidence for visualization and diagnostics, not a replacement for
+    ``docker compose config``.
+    """
+    data = yaml.safe_load(path.read_text(errors="replace")) or {}
+    raw_services = data.get("services") if isinstance(data, dict) else {}
+    if not isinstance(raw_services, dict):
+        return {}
+    env = load_env(path.parent / ".env")
+    details: dict[str, dict[str, Any]] = {}
+    for raw_name, raw_config in raw_services.items():
+        if not isinstance(raw_config, dict):
+            continue
+        name = str(raw_name)
+        build = raw_config.get("build")
+        if isinstance(build, str):
+            build_context, dockerfile = build, "Dockerfile"
+        elif isinstance(build, dict):
+            build_context, dockerfile = build.get("context", "."), build.get("dockerfile", "Dockerfile")
+        else:
+            build_context, dockerfile = None, None
+        depends = raw_config.get("depends_on") or []
+        if isinstance(depends, dict):
+            depends = list(depends)
+        volumes = raw_config.get("volumes") or []
+        networks = raw_config.get("networks") or []
+        if isinstance(networks, dict):
+            networks = list(networks)
+        bindings = [binding for value in raw_config.get("ports", []) or [] if (binding := parse_port(value, env))]
+        for binding in bindings:
+            binding.service = name
+            binding.source = str(path)
+        details[name] = {
+            "name": name,
+            "image": raw_config.get("image"),
+            "build_context": str(build_context) if build_context is not None else None,
+            "dockerfile": str(dockerfile) if dockerfile is not None else None,
+            "depends_on": [str(item) for item in depends],
+            "ports": bindings,
+            "volumes": [str(item) if not isinstance(item, dict) else item for item in volumes],
+            "networks": [str(item) for item in networks],
+            "restart": raw_config.get("restart"),
+            "command": raw_config.get("command"),
+        }
+    return details

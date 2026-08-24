@@ -45,7 +45,19 @@ class DockerService:
                             source=labels.get("com.docker.compose.project.config_files"),
                         )
                     )
+        exposed: list[PortBinding] = []
+        for internal in config.get("ExposedPorts") or {}:
+            container_port, _, protocol = internal.partition("/")
+            if container_port.isdigit():
+                exposed.append(
+                    PortBinding(
+                        host_port=int(container_port), container_port=int(container_port), protocol=protocol or "tcp"
+                    )
+                )
         image = config.get("Image") or next(iter(attrs.get("RepoTags") or []), "<unknown>")
+        command = config.get("Cmd") or []
+        if isinstance(command, str):
+            command = [command]
         return ContainerInfo(
             id=container.id,
             name=container.name,
@@ -55,12 +67,15 @@ class DockerService:
             health=(state.get("Health") or {}).get("Status"),
             restart_count=attrs.get("RestartCount", 0),
             ports=bindings,
+            exposed_ports=exposed,
             mounts=attrs.get("Mounts", []),
             networks=list((attrs.get("NetworkSettings", {}).get("Networks") or {}).keys()),
             labels=labels,
             compose_project=labels.get("com.docker.compose.project"),
             compose_service=labels.get("com.docker.compose.service"),
             compose_working_dir=labels.get("com.docker.compose.project.working_dir"),
+            created=attrs.get("Created"),
+            command=[str(item) for item in command],
         )
 
     def list_containers(self, all: bool = True) -> list[ContainerInfo]:
@@ -154,8 +169,25 @@ class DockerService:
                 "name": volume.name,
                 "driver": volume.attrs.get("Driver"),
                 "mountpoint": volume.attrs.get("Mountpoint"),
+                "size": (volume.attrs.get("UsageData") or {}).get("Size"),
+                "created": volume.attrs.get("CreatedAt"),
+                "labels": volume.attrs.get("Labels") or {},
                 "users": [
-                    c.name for c in containers if any(m.get("Name") == volume.name for m in c.attrs.get("Mounts", []))
+                    {
+                        "name": c.name,
+                        "id": c.id,
+                        "destination": mount.get("Destination"),
+                        "read_only": not bool(mount.get("RW", True)),
+                        "compose_project": (c.attrs.get("Config", {}).get("Labels") or {}).get(
+                            "com.docker.compose.project"
+                        ),
+                        "compose_service": (c.attrs.get("Config", {}).get("Labels") or {}).get(
+                            "com.docker.compose.service"
+                        ),
+                    }
+                    for c in containers
+                    for mount in c.attrs.get("Mounts", [])
+                    if mount.get("Name") == volume.name
                 ],
             }
             for volume in self.client.volumes.list()
@@ -167,14 +199,28 @@ class DockerService:
         except NotFound as exc:
             raise LookupError(f"Volume not found: {identifier}") from exc
         users = [
-            container.name
+            {
+                "name": container.name,
+                "id": container.id,
+                "destination": mount.get("Destination"),
+                "read_only": not bool(mount.get("RW", True)),
+                "compose_project": (container.attrs.get("Config", {}).get("Labels") or {}).get(
+                    "com.docker.compose.project"
+                ),
+                "compose_service": (container.attrs.get("Config", {}).get("Labels") or {}).get(
+                    "com.docker.compose.service"
+                ),
+            }
             for container in self.client.containers.list(all=True)
-            if any(mount.get("Name") == volume.name for mount in container.attrs.get("Mounts", []))
+            for mount in container.attrs.get("Mounts", [])
+            if mount.get("Name") == volume.name
         ]
         return {
             "name": volume.name,
             "driver": volume.attrs.get("Driver"),
             "mountpoint": volume.attrs.get("Mountpoint"),
+            "size": (volume.attrs.get("UsageData") or {}).get("Size"),
+            "created": volume.attrs.get("CreatedAt"),
             "labels": volume.attrs.get("Labels") or {},
             "users": users,
         }
@@ -197,7 +243,17 @@ class DockerService:
                 "name": network.name,
                 "driver": network.attrs.get("Driver"),
                 "scope": network.attrs.get("Scope"),
-                "members": [item.get("Name") for item in (network.attrs.get("Containers") or {}).values()],
+                "labels": network.attrs.get("Labels") or {},
+                "members": [
+                    {
+                        "id": item.get("Name") or identifier,
+                        "name": item.get("Name"),
+                        "ipv4_address": item.get("IPv4Address"),
+                        "ipv6_address": item.get("IPv6Address"),
+                        "mac_address": item.get("MacAddress"),
+                    }
+                    for identifier, item in (network.attrs.get("Containers") or {}).items()
+                ],
             }
             for network in self.client.networks.list()
         ]
@@ -224,3 +280,10 @@ class DockerService:
             "volumes": {"count": len(data.get("Volumes") or [])},
             "build_cache": {"count": len(data.get("BuildCache") or [])},
         }
+
+    def events(self):
+        """Yield Docker event dictionaries when the daemon supports an event stream."""
+        try:
+            yield from self.client.events(decode=True)
+        except DockerException as exc:
+            raise DockerUnavailable(f"Docker event stream unavailable: {exc}") from exc

@@ -4,5 +4,7 @@ Prefer read-only investigation before modification. Treat port conflicts as firs
 Prefer source configuration and Compose-level operations. Never expose secrets.
 Never perform destructive actions without explicit persisted approval.
 Never claim success without verification. Use minimal changes and no unrestricted shell.
+Use topology and typed inspection tools to gather evidence before proposing a hypothesis.
+Clearly separate observed facts, deterministic impact, and uncertainty.
 Return concise evidence, not private chain-of-thought.
 """

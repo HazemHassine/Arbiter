@@ -19,15 +19,21 @@
       <nav class="nav" aria-label="Control panel">
         <p class="nav-label">Workspace</p>
         <a href="#overview" data-view="overview" class="active"><span class="nav-icon">⌁</span>Overview</a>
-        <a href="#agent" data-view="agent"><span class="nav-icon">✦</span>Ask Agent</a>
+        <a href="#workspaces" data-view="workspaces"><span class="nav-icon">◇</span>Workspaces <b id="nav-project-count">—</b></a>
+        <a href="#topology" data-view="topology"><span class="nav-icon">⌘</span>Topology</a>
         <a href="#ports" data-view="ports"><span class="nav-icon">⇄</span>Ports <b id="nav-port-count">—</b></a>
-        <a href="#projects" data-view="projects"><span class="nav-icon">◇</span>Projects <b id="nav-project-count">—</b></a>
+        <a href="#processes" data-view="processes"><span class="nav-icon">⌘</span>Processes</a>
         <p class="nav-label">Runtime</p>
         <a href="#containers" data-view="containers"><span class="nav-icon">▣</span>Containers <b id="nav-container-count">—</b></a>
         <a href="#docker" data-view="docker"><span class="nav-icon">◫</span>Docker</a>
+        <a href="#files" data-view="files"><span class="nav-icon">▤</span>Files</a>
+        <p class="nav-label">Observe</p>
+        <a href="#activity" data-view="activity"><span class="nav-icon">◷</span>Activity</a>
+        <a href="#agent" data-view="agent"><span class="nav-icon">✦</span>Ask Agent</a>
         <p class="nav-label">Safety</p>
         <a href="#approvals" data-view="approvals"><span class="nav-icon">✓</span>Approvals <b id="nav-approval-count">—</b></a>
         <a href="#history" data-view="history"><span class="nav-icon">↺</span>Action History</a>
+        <a href="#settings" data-view="settings"><span class="nav-icon">⚙</span>Settings</a>
       </nav>
 
       <div class="sidebar-foot">
@@ -45,6 +51,7 @@
         </div>
         <div class="top-actions">
           <span class="last-sync" id="last-sync">Not synced</span>
+          <button class="button secondary palette-trigger" id="open-palette" title="Search resources and actions (Ctrl+K)">⌘K</button>
           <button class="icon-button" id="refresh-all" title="Refresh current view">↻</button>
           <button class="button primary" data-open-agent><span>✦</span> Ask agent</button>
         </div>
@@ -110,6 +117,34 @@
           </div>
         </section>
 
+        <section class="view" id="view-workspaces" data-title="Workspaces" data-eyebrow="CONNECTED PROJECTS">
+          <div class="toolbar">
+            <div class="search"><span>⌕</span><input id="workspace-search" placeholder="Filter workspaces"></div>
+            <button class="button secondary" id="workspace-scan">Scan configured roots</button>
+            <button class="button secondary" data-refresh="workspaces">↻ Refresh</button>
+          </div>
+          <div class="workspace-grid" id="workspaces-grid"><div class="skeleton block"></div></div>
+          <section id="workspace-detail" class="workspace-detail hidden"></section>
+        </section>
+
+        <section class="view" id="view-topology" data-title="Topology" data-eyebrow="CONNECTED LOCAL RESOURCES">
+          <div class="toolbar topology-toolbar">
+            <div class="search"><span>⌕</span><input id="topology-search" placeholder="Filter graph labels"></div>
+            <select id="topology-project" aria-label="Topology scope"><option value="">All observed resources</option></select>
+            <button class="button secondary" data-topology-zoom="in">＋</button>
+            <button class="button secondary" data-topology-zoom="out">−</button>
+            <button class="button secondary" data-topology-zoom="reset">Reset</button>
+            <button class="button secondary" data-refresh="topology">↻ Refresh</button>
+          </div>
+          <div class="topology-layout">
+            <article class="panel topology-panel">
+              <div class="topology-legend" id="topology-legend"></div>
+              <div class="topology-stage" id="topology-stage"><svg id="topology-graph" viewBox="0 0 1200 720" role="img" aria-label="Development resource topology"></svg></div>
+            </article>
+            <article class="panel topology-summary" id="topology-summary"><div class="empty-inline">Load the graph to inspect connected resources.</div></article>
+          </div>
+        </section>
+
         <section class="view" id="view-ports" data-title="Port coordination" data-eyebrow="HOST NETWORK">
           <div class="toolbar">
             <div class="search"><span>⌕</span><input id="port-search" placeholder="Filter by port, process, container, or project"></div>
@@ -120,7 +155,7 @@
             <article class="panel"><p class="eyebrow">COORDINATION</p><h3>Conflict status</h3><div id="conflict-summary" class="big-status"><span class="spinner"></span> Checking claims</div></article>
             <article class="panel"><p class="eyebrow">ALLOCATION</p><h3>Free-port finder</h3><div class="inline-form"><input id="range-start" type="number" value="3000" min="1" max="65535"><span>to</span><input id="range-end" type="number" value="4000" min="1" max="65535"><input id="range-count" type="number" value="5" min="1" max="100"><button class="button primary" id="run-free-search">Find</button></div><div class="port-pills" id="free-results"></div></article>
           </div>
-          <article class="panel table-panel"><div class="table-wrap"><table><thead><tr><th>Port</th><th>Protocol</th><th>Owner</th><th>Project / service</th><th>Source</th><th>Status</th></tr></thead><tbody id="ports-table"></tbody></table></div></article>
+          <article class="panel table-panel"><div class="table-wrap"><table><thead><tr><th>Port</th><th>Protocol</th><th>Owner</th><th>Project / service</th><th>Source</th><th>Status</th><th>Topology</th></tr></thead><tbody id="ports-table"></tbody></table></div></article>
         </section>
 
         <section class="view" id="view-projects" data-title="Projects" data-eyebrow="PROJECT REGISTRY">
@@ -130,6 +165,11 @@
             <button class="button secondary" data-refresh="projects">↻ Refresh</button>
           </div>
           <div class="card-grid" id="projects-grid"></div>
+        </section>
+
+        <section class="view" id="view-processes" data-title="Host processes" data-eyebrow="LOCAL RUNTIME">
+          <div class="toolbar"><div class="search"><span>⌕</span><input id="process-search" placeholder="Filter by PID, command, project, port, or kind"></div><button class="button secondary" data-refresh="processes">↻ Refresh</button></div>
+          <article class="panel table-panel"><div class="table-wrap"><table><thead><tr><th>Process</th><th>PID / parent</th><th>Kind</th><th>Ports</th><th>Project / CWD</th><th>CPU</th><th>Memory</th></tr></thead><tbody id="processes-table"></tbody></table></div></article>
         </section>
 
         <section class="view" id="view-containers" data-title="Containers" data-eyebrow="DOCKER RUNTIME">
@@ -142,6 +182,28 @@
           <div id="docker-content"><div class="skeleton block"></div></div>
         </section>
 
+        <section class="view" id="view-files" data-title="Project files" data-eyebrow="SAFE CONFIGURATION EDITOR">
+          <div class="toolbar files-toolbar">
+            <select id="file-project" aria-label="Project"><option value="">Select registered workspace…</option></select>
+            <div class="search"><span>⌕</span><input id="file-search" placeholder="Filter editable files"></div>
+            <button class="button secondary" id="file-reload">↻ Reload</button>
+          </div>
+          <div class="file-editor-layout">
+            <aside class="file-list panel" id="file-list"><div class="empty-inline">Select a workspace to show editable configuration files.</div></aside>
+            <article class="panel editor-panel">
+              <div class="editor-head"><div><p class="eyebrow" id="editor-kind">SAFE EDITOR</p><h3 id="editor-path">No file selected</h3></div><div class="editor-actions"><button class="button secondary" id="file-revert" disabled>Revert</button><button class="button secondary" id="file-undo" disabled>Undo managed change</button><button class="button primary" id="file-save" disabled>Preview & save</button></div></div>
+              <div class="editor-search"><input id="editor-find" placeholder="Find in file"></div>
+              <div class="code-editor"><pre id="editor-gutter" aria-hidden="true">1</pre><textarea id="file-editor" spellcheck="false" aria-label="Project file editor" disabled></textarea></div>
+              <p class="editor-note" id="editor-note">Only known project configuration files are editable. Every save creates a backup, shows a diff, and requires approval.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="view" id="view-activity" data-title="Live activity" data-eyebrow="OBSERVATION STREAM">
+          <div class="section-intro"><div><h2>What changed on this machine.</h2><p>Docker events and lightweight host polling update this feed automatically.</p></div><button class="button secondary" data-refresh="activity">↻ Refresh</button></div>
+          <div class="activity-feed" id="activity-feed"><div class="skeleton rows"></div></div>
+        </section>
+
         <section class="view" id="view-approvals" data-title="Approvals" data-eyebrow="SAFETY GATE">
           <div class="section-intro"><div><h2>Human decisions, exact actions.</h2><p>Approval executes the stored action and arguments exactly as proposed.</p></div><button class="button secondary" data-refresh="approvals">↻ Refresh</button></div>
           <div class="approval-list" id="approval-list"></div>
@@ -151,12 +213,21 @@
           <div class="toolbar"><div class="filter-group"><button class="filter active" data-history-filter="all">All</button><button class="filter" data-history-filter="completed">Completed</button><button class="filter" data-history-filter="failed">Failed</button></div><button class="button secondary" data-refresh="history">↻ Refresh</button></div>
           <article class="panel table-panel"><div class="table-wrap"><table><thead><tr><th>Action</th><th>Risk</th><th>Status</th><th>Verification</th><th>Request</th></tr></thead><tbody id="history-table"></tbody></table></div></article>
         </section>
+
+        <section class="view" id="view-settings" data-title="Settings" data-eyebrow="LOCAL CAPABILITIES">
+          <div class="section-intro"><div><h2>Runtime capabilities</h2><p>Docker is fully integrated. Other local runtimes are detected without claiming unsupported controls.</p></div><button class="button secondary" data-refresh="settings">↻ Refresh</button></div>
+          <div class="runtime-grid" id="runtime-grid"><div class="skeleton block"></div></div>
+          <article class="panel settings-observation" id="observation-status"></article>
+        </section>
       </div>
     </main>
   </div>
 
   <dialog id="detail-dialog"><div class="dialog-head"><div><p class="eyebrow" id="dialog-eyebrow">DETAILS</p><h2 id="dialog-title">Details</h2></div><button class="icon-button" data-close-dialog>×</button></div><div id="dialog-content" class="dialog-content"></div></dialog>
+  <aside id="resource-inspector" class="resource-inspector" aria-label="Resource inspector" aria-hidden="true"><header class="inspector-head"><div><p class="eyebrow" id="inspector-type">RESOURCE</p><h2 id="inspector-title">Select a resource</h2></div><button class="icon-button" id="close-inspector" aria-label="Close inspector">×</button></header><div class="inspector-content" id="inspector-content"></div></aside>
+  <dialog id="command-palette" class="command-palette"><div class="palette-head"><span>⌕</span><input id="palette-input" placeholder="Search projects, ports, processes, containers, actions…" autocomplete="off"><kbd>Esc</kbd></div><div class="palette-results" id="palette-results"><div class="empty-inline">Start typing to search the local topology.</div></div></dialog>
   <div class="toast-stack" id="toasts" aria-live="polite"></div>
   <script src="/ui/app.js" defer></script>
+  <script src="/ui/control-plane.js" defer></script>
 </body>
 </html>
