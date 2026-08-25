@@ -600,7 +600,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
         return [item.model_dump(mode="json") for item in services.ports.scanner.scan()]
 
     app.include_router(router)
-    ui_directory = Path(__file__).resolve().parent.parent / "ui"
+    ui_directory = Path(__file__).resolve().parent.parent / "ui" / "out"
     app.mount("/ui", StaticFiles(directory=ui_directory, html=True), name="control-panel")
     return app
 

@@ -23,17 +23,16 @@ and embedded localhost previews. The Admin page adds rolling API latency, LLM
 usage, event pipeline, process/database, agent-harness, and safety-policy views
 alongside an operational handbook. Docker resources, command search, port
 tracing, and the approval-protected project file editor remain available in the
-same shell. The UI is bundled locally with no frontend build step or external
-runtime assets, including a locally vendored Lucide icon subset, and uses the
-same REST safety pipeline as the CLI.
+same shell. The bundled UI is a statically exported Next.js application, so it
+needs no separate frontend runtime server. FastAPI serves the export directly,
+and the UI uses the same REST safety pipeline as the CLI.
 
 ## What it observes
 
 - A fresh topology graph links projects, Compose files/services, containers,
   images, volumes, networks, ports, host processes, Dockerfiles, and Make targets.
-- The topology canvas supports pointer-centered wheel zoom, canvas panning,
-  draggable nodes, fit-to-view, flow/radial layouts, connected-path focus, and
-  strict natural-language resource filtering.
+- The topology canvas supports zoom and fit controls, connected-path focus,
+  project scoping, local search, and strict natural-language resource filtering.
 - Runtime-driven discovery creates ephemeral workspace evidence from Compose
   labels and process working directories; explicit registration remains required
   before a project can be edited.
@@ -205,6 +204,12 @@ A2A ecosystem is still evolving; REST is the stable transport for v1.
 uv sync --extra dev
 uv run pytest
 uv run ruff check .
+
+# Rebuild the statically exported Next.js control panel
+cd src/dev_agent/ui
+npm install
+npm run typecheck
+npm run build
 ```
 
 Tests mock system/Docker state and never mutate the host Docker environment.

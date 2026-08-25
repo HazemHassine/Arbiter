@@ -1,0 +1,1 @@
+/* The control plane now runs from the statically exported Next.js application. */

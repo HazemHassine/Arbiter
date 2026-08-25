@@ -1,11 +1,61 @@
+# Environment and local secrets
 .env
+.env.*
+!.env.example
 .venv/
+venv/
+
+# Python bytecode, tooling, and build output
 __pycache__/
+*.py[cod]
+*.egg-info/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.hypothesis/
+.mypy_cache/
+.nox/
 .pytest_cache/
 .ruff_cache/
-*.py[cod]
-*.db
-*.bak.*
+.tox/
+build/
 dist/
+site/
 
+# Local databases, logs, backups, and temporary files
+*.db
+*.db-shm
+*.db-wal
+*.log
+*.bak
+*.bak.*
+*.tmp
+.cache/
+tmp/
+temp/
+
+# Node and Next.js build workspace
+node_modules/
+.next/
+.turbo/
+.vercel/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# The static `src/dev_agent/ui/out/` export is intentionally bundled and tracked.
+
+# Editors and operating systems
+.idea/
+.vscode/
+*.swo
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# Local planning notes
 next_steps.md
