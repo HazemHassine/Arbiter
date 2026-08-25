@@ -81,8 +81,9 @@ def test_agent_api_degrades_instead_of_returning_500(service_factory, monkeypatc
 
     async def fail(*_args, **_kwargs):
         raise AgentRuntimeError("upstream rejected this request")
+        yield  # pragma: no cover
 
-    monkeypatch.setattr(AgentRuntime, "run", fail)
+    monkeypatch.setattr(AgentRuntime, "stream", fail)
     with TestClient(create_app(services=services)) as client:
         response = client.post("/api/v1/agent/query", json={"message": "Explain my environment"})
     assert response.status_code == 200

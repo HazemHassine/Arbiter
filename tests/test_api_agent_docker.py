@@ -1,3 +1,5 @@
+import json
+
 from fastapi.testclient import TestClient
 
 from dev_agent.agent.service import AgentService
@@ -56,10 +58,27 @@ def test_agent_query_api(service_factory):
     assert response.json()["approval_required"] is False
 
 
+def test_agent_query_stream_returns_live_ndjson_without_replacing_query_route(service_factory):
+    client = TestClient(create_app(services=service_factory()))
+
+    with client.stream(
+        "POST", "/api/v1/agent/query/stream", json={"message": "Which projects have port conflicts?"}
+    ) as response:
+        events = [json.loads(line) for line in response.iter_lines() if line]
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/x-ndjson")
+    assert events[0]["type"] == "step_started"
+    assert any(event["type"] == "step_completed" for event in events)
+    assert events[-1]["type"] == "final"
+    assert events[-1]["response"]["approval_required"] is False
+
+
 def test_frontend_api_route_contract_remains_available(service_factory):
     schema = create_app(services=service_factory()).openapi()
     required = {
         "/api/v1/agent/query": "post",
+        "/api/v1/agent/query/stream": "post",
         "/api/v1/events/stream": "get",
         "/api/v1/projects": "get",
         "/api/v1/projects/{identifier}/prepare": "post",

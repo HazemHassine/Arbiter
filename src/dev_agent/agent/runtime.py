@@ -1,6 +1,7 @@
 import json
 import threading
 import time
+from collections.abc import AsyncIterator
 from contextlib import suppress
 from typing import Any
 from uuid import UUID
@@ -17,6 +18,7 @@ from openai import APIConnectionError, APIStatusError, APITimeoutError
 from dev_agent.agent.prompts import SYSTEM_PROMPT
 from dev_agent.agent.tools import AgentTools
 from dev_agent.config import Settings
+from dev_agent.security import redact
 from dev_agent.telemetry import TelemetryRegistry
 
 
@@ -102,11 +104,103 @@ class AgentRuntime:
         )
 
     async def run(self, message: str) -> dict[str, Any]:
+        outcome: dict[str, Any] | None = None
+        async for event in self.stream(message):
+            if event["type"] == "runtime_completed":
+                outcome = event["outcome"]
+        return outcome or {"message": "No response", "observations": []}
+
+    async def stream(self, message: str) -> AsyncIterator[dict[str, Any]]:
+        messages: list[Any] = []
+        model_call = 1
+        model_step_id = f"model-{model_call}"
+        yield {
+            "type": "step_started",
+            "step_id": model_step_id,
+            "kind": "model",
+            "title": "Planning next action",
+            "detail": "Choosing the next safe action from the available typed tools.",
+        }
         try:
-            state = await self.graph.ainvoke(
+            updates = self.graph.astream(
                 {"messages": [{"role": "user", "content": message}]},
                 config={"recursion_limit": self.max_steps * 3 + 2},
+                stream_mode="updates",
+                version="v2",
             )
+            async for update in updates:
+                update_messages = _messages_from_update(update)
+                saw_tool_result = False
+                for item in update_messages:
+                    messages.append(item)
+                    if isinstance(item, AIMessage):
+                        if model_step_id:
+                            detail = (
+                                f"Selected {len(item.tool_calls)} tool call(s)."
+                                if item.tool_calls
+                                else "Prepared the final response from collected evidence."
+                            )
+                            yield {
+                                "type": "step_completed",
+                                "step_id": model_step_id,
+                                "kind": "model",
+                                "title": "Planning next action" if model_call == 1 else "Evaluating evidence",
+                                "detail": detail,
+                                "status": "completed",
+                            }
+                            model_step_id = ""
+                        for call in item.tool_calls:
+                            yield {
+                                "type": "step_started",
+                                "step_id": call["id"],
+                                "kind": "tool",
+                                "title": _tool_title(call["name"]),
+                                "detail": f"Calling {call['name']} with validated arguments.",
+                                "tool": call["name"],
+                                "arguments": redact(call.get("args") or {}),
+                            }
+                        for call in item.invalid_tool_calls:
+                            step_id = call.get("id") or f"invalid-{len(messages)}"
+                            yield {
+                                "type": "step_started",
+                                "step_id": step_id,
+                                "kind": "tool",
+                                "title": _tool_title(call.get("name") or "invalid_tool_call"),
+                                "detail": "The model requested a tool with invalid arguments.",
+                                "tool": call.get("name"),
+                            }
+                            yield {
+                                "type": "step_completed",
+                                "step_id": step_id,
+                                "kind": "tool",
+                                "title": _tool_title(call.get("name") or "invalid_tool_call"),
+                                "detail": call.get("error") or "The model returned invalid tool arguments.",
+                                "status": "error",
+                            }
+                    elif isinstance(item, ToolMessage):
+                        saw_tool_result = True
+                        result = _tool_result(item)
+                        failed = item.status == "error" or isinstance(result, dict) and bool(result.get("error"))
+                        yield {
+                            "type": "step_completed",
+                            "step_id": item.tool_call_id,
+                            "kind": "tool",
+                            "title": _tool_title(item.name or "tool"),
+                            "detail": "Tool returned an error." if failed else "Tool completed and returned evidence.",
+                            "tool": item.name,
+                            "result": redact(result),
+                            "status": "error" if failed else "completed",
+                        }
+                if saw_tool_result:
+                    model_call += 1
+                    model_step_id = f"model-{model_call}"
+                    yield {
+                        "type": "step_started",
+                        "step_id": model_step_id,
+                        "kind": "model",
+                        "title": "Evaluating evidence",
+                        "detail": "Reviewing tool results and deciding whether more evidence is needed.",
+                    }
         except APIStatusError as exc:
             detail = str(getattr(exc, "message", "") or f"HTTP {exc.status_code}")
             raise AgentRuntimeError(_sanitize_error(detail)) from exc
@@ -115,14 +209,16 @@ class AgentRuntime:
         except APIConnectionError as exc:
             raise AgentRuntimeError("LLM provider could not be reached") from exc
 
-        messages = state.get("messages", [])
         final = next(
             (item for item in reversed(messages) if isinstance(item, AIMessage) and not item.tool_calls),
             None,
         )
-        return {
-            "message": final.text if final and final.text else "No response",
-            "observations": _observations(messages),
+        yield {
+            "type": "runtime_completed",
+            "outcome": {
+                "message": final.text if final and final.text else "No response",
+                "observations": _observations(messages),
+            },
         }
 
 
@@ -145,11 +241,29 @@ def _observations(messages: list[Any]) -> list[dict[str, Any]]:
 
 
 def _observation(message: ToolMessage) -> dict[str, Any]:
+    return {"tool": message.name, "result": _tool_result(message)}
+
+
+def _tool_result(message: ToolMessage) -> Any:
     result: Any = message.content
     if isinstance(result, str):
         with suppress(json.JSONDecodeError):
             result = json.loads(result)
-    return {"tool": message.name, "result": result}
+    return result
+
+
+def _messages_from_update(update: dict[str, Any]) -> list[Any]:
+    if update.get("type") != "updates" or not isinstance(update.get("data"), dict):
+        return []
+    messages: list[Any] = []
+    for value in update["data"].values():
+        if isinstance(value, dict) and isinstance(value.get("messages"), list):
+            messages.extend(value["messages"])
+    return messages
+
+
+def _tool_title(name: str) -> str:
+    return name.replace("_", " ").strip().capitalize() or "Tool call"
 
 
 def _sanitize_error(detail: str) -> str:

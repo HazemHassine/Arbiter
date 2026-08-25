@@ -111,6 +111,13 @@ curl -X POST http://127.0.0.1:8765/api/v1/agent/query \
   -d '{"message":"What is using port 5432?"}'
 ```
 
+The browser uses `POST /api/v1/agent/query/stream`, which returns newline-delimited
+JSON events for routing, model phases, typed tool calls, redacted arguments and
+results, errors, and the final response. The original query endpoint remains the
+stable non-streaming contract for CLI and integration clients. Agent answers are
+rendered as GitHub-flavored Markdown without enabling raw HTML. The execution
+trace exposes actions and evidence, not private model chain-of-thought.
+
 ## Topology, process, and editor APIs
 
 ```bash

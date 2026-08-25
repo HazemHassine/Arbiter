@@ -1,8 +1,10 @@
+from collections.abc import AsyncIterator
 from pathlib import Path
 from uuid import uuid4
 
 from dev_agent.models import ActionSpec, Risk
 from dev_agent.persistence.tables import AgentRequestRow
+from dev_agent.security import redact
 from dev_agent.services import Services
 
 
@@ -264,20 +266,84 @@ class AgentService:
         )
 
     async def async_query(self, message: str) -> dict[str, object]:
+        response: dict[str, object] | None = None
+        async for event in self.async_query_events(message):
+            if event["type"] == "final":
+                response = event["response"]
+        if response is None:
+            raise RuntimeError("Agent stream ended without a final response")
+        return response
+
+    async def async_query_events(self, message: str) -> AsyncIterator[dict[str, object]]:
+        classification_step = "classify-request"
+        yield {
+            "type": "step_started",
+            "step_id": classification_step,
+            "kind": "routing",
+            "title": "Inspecting request",
+            "detail": "Checking deterministic capabilities before invoking a model.",
+        }
         deterministic = self.query(message)
-        if deterministic["observations"] or "not covered" not in str(deterministic["message"]):
-            return deterministic
+        deterministic_match = bool(deterministic["observations"]) or "not covered" not in str(
+            deterministic["message"]
+        )
+        if deterministic_match:
+            yield {
+                "type": "step_completed",
+                "step_id": classification_step,
+                "kind": "routing",
+                "title": "Inspecting request",
+                "detail": "Handled by deterministic control-plane services; no model call was needed.",
+                "status": "completed",
+            }
+            observations = deterministic.get("observations") or []
+            if observations:
+                yield {
+                    "type": "step_completed",
+                    "step_id": "deterministic-evidence",
+                    "kind": "evidence",
+                    "title": "Collected live evidence",
+                    "detail": f"Collected {len(observations)} observation(s) from local services.",
+                    "status": "completed",
+                    "result": redact(observations),
+                }
+            yield {"type": "final", "response": deterministic}
+            return
         settings = self.services.settings
         if not settings.llm_api_key or not settings.llm_model:
-            return deterministic
+            yield {
+                "type": "step_completed",
+                "step_id": classification_step,
+                "kind": "routing",
+                "title": "Inspecting request",
+                "detail": "No deterministic intent matched and no model is configured.",
+                "status": "completed",
+            }
+            yield {"type": "final", "response": deterministic}
+            return
         from dev_agent.agent.runtime import AgentRuntime, AgentRuntimeError, build_agent_model
         from dev_agent.agent.tools import AgentTools
 
+        yield {
+            "type": "step_completed",
+            "step_id": classification_step,
+            "kind": "routing",
+            "title": "Inspecting request",
+            "detail": "Delegated the open-ended request to the bounded LangGraph runtime.",
+            "status": "completed",
+        }
         try:
             model = build_agent_model(settings, self.services.telemetry)
-            outcome = await AgentRuntime(model, AgentTools(self), settings.agent_max_steps).run(message)
+            outcome: dict[str, object] | None = None
+            async for event in AgentRuntime(model, AgentTools(self), settings.agent_max_steps).stream(message):
+                if event["type"] == "runtime_completed":
+                    outcome = event["outcome"]
+                else:
+                    yield event
+            if outcome is None:
+                raise RuntimeError("Agent runtime ended without an outcome")
         except AgentRuntimeError as exc:
-            return self._update_request(
+            response = self._update_request(
                 deterministic["request_id"],
                 {
                     "request_id": deterministic["request_id"],
@@ -288,8 +354,11 @@ class AgentService:
                     "approval_required": False,
                 },
             )
+            yield {"type": "run_error", "message": str(response["message"])}
+            yield {"type": "final", "response": response}
+            return
         except Exception:
-            return self._update_request(
+            response = self._update_request(
                 deterministic["request_id"],
                 {
                     "request_id": deterministic["request_id"],
@@ -300,6 +369,9 @@ class AgentService:
                     "approval_required": False,
                 },
             )
+            yield {"type": "run_error", "message": str(response["message"])}
+            yield {"type": "final", "response": response}
+            return
         approval_required = any(
             isinstance(item.get("result"), dict) and item["result"].get("status") == "approval_required"
             for item in outcome.get("observations", [])
@@ -312,7 +384,8 @@ class AgentService:
             "actions": [],
             "approval_required": approval_required,
         }
-        return self._update_request(deterministic["request_id"], response)
+        persisted = self._update_request(deterministic["request_id"], response)
+        yield {"type": "final", "response": persisted}
 
     def _persist_request(self, message: str, response: dict[str, object]) -> dict[str, object]:
         with self.services.database.sessions() as session:

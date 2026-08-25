@@ -45,3 +45,48 @@ export function remove<T>(path: string): Promise<T> {
 export function eventStreamUrl(): string {
   return `${API_ROOT}/events/stream`;
 }
+
+export async function streamJsonLines<T>(
+  path: string,
+  body: unknown,
+  onEvent: (event: T) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const url = `${API_ROOT}${path.startsWith("/") ? path : `/${path}`}`;
+  const response = await fetch(url, {
+    method: "POST",
+    body: JSON.stringify(body),
+    cache: "no-store",
+    headers: { "Content-Type": "application/json", Accept: "application/x-ndjson" },
+    signal,
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    let responseBody: unknown = text;
+    try { responseBody = JSON.parse(text) as unknown; } catch { /* Keep the plain-text error body. */ }
+    const detail =
+      responseBody && typeof responseBody === "object" && "detail" in responseBody
+        ? String((responseBody as { detail: unknown }).detail)
+        : `Request failed (${response.status})`;
+    throw new ApiError(detail, response.status, responseBody);
+  }
+  if (!response.body) throw new ApiError("Streaming response body is unavailable", response.status, null);
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  const emit = (line: string) => {
+    const trimmed = line.trim();
+    if (trimmed) onEvent(JSON.parse(trimmed) as T);
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value, { stream: !done });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    lines.forEach(emit);
+    if (done) break;
+  }
+  emit(buffer);
+}

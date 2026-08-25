@@ -400,6 +400,11 @@ query result rather than an unhandled HTTP 500.
 
 Agent requests and their final responses are persisted in SQLite. The public
 `POST /api/v1/agent/query` request and response contract is unchanged.
+`POST /api/v1/agent/query/stream` adds an NDJSON projection for the browser with
+safe routing, model-phase, tool-call, tool-result, error, and final-response
+events. It deliberately exposes operational actions and evidence rather than
+private model reasoning. The UI renders final answers as GitHub-flavored Markdown
+with raw HTML disabled.
 
 ## 15. Persistence
 

@@ -1,3 +1,4 @@
+import json
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -18,7 +19,7 @@ from dev_agent.intelligence import IntelligenceService
 from dev_agent.make.service import MakeService
 from dev_agent.models import ActionSpec, Risk
 from dev_agent.persistence.tables import ActionRow
-from dev_agent.security import redact_action_arguments
+from dev_agent.security import redact, redact_action_arguments
 from dev_agent.services import Services, build_services
 
 
@@ -140,6 +141,18 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     @router.post("/agent/query")
     async def query(body: AgentQuery, services: Dep) -> dict[str, object]:
         return await AgentService(services).async_query(body.message)
+
+    @router.post("/agent/query/stream")
+    async def query_stream(body: AgentQuery, services: Dep) -> StreamingResponse:
+        async def frames():
+            async for event in AgentService(services).async_query_events(body.message):
+                yield json.dumps(redact(event), default=str, separators=(",", ":")) + "\n"
+
+        return StreamingResponse(
+            frames(),
+            media_type="application/x-ndjson",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "X-Content-Type-Options": "nosniff"},
+        )
 
     @router.get("/ports")
     def ports(services: Dep) -> list[dict[str, Any]]:
