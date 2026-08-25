@@ -270,20 +270,13 @@ class AgentService:
         settings = self.services.settings
         if not settings.llm_api_key or not settings.llm_model:
             return deterministic
-        from dev_agent.agent.loop import AgentLoop
+        from dev_agent.agent.runtime import AgentRuntime, AgentRuntimeError, build_agent_model
         from dev_agent.agent.tools import AgentTools
-        from dev_agent.llm.openai_compatible import LLMProviderError, OpenAICompatibleProvider
 
-        provider = OpenAICompatibleProvider(
-            settings.llm_base_url,
-            settings.llm_api_key,
-            settings.llm_model,
-            reasoning_effort=settings.llm_reasoning_effort,
-            telemetry=self.services.telemetry,
-        )
         try:
-            outcome = await AgentLoop(provider, AgentTools(self), settings.agent_max_steps).run(message)
-        except LLMProviderError as exc:
+            model = build_agent_model(settings, self.services.telemetry)
+            outcome = await AgentRuntime(model, AgentTools(self), settings.agent_max_steps).run(message)
+        except AgentRuntimeError as exc:
             return self._update_request(
                 deterministic["request_id"],
                 {

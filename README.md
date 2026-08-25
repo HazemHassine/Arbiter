@@ -80,8 +80,8 @@ The code under `src/dev_agent` is split into domain services:
   pre-operation impact summaries.
 - `safety`, `actions`, and `persistence`: immutable persisted approvals, one typed
   action dispatcher, history, and mandatory verification outcomes.
-- `agent`: deterministic intents plus a small OpenAI-compatible, bounded
-  tool-calling loop when an LLM is configured.
+- `agent`: deterministic intents plus LangChain v1's `create_agent` runtime,
+  backed by LangGraph and restricted to the control plane's typed tools.
 - `api`, `cli`, and `integrations`: thin adapters over the same services.
 
 SQLite stores registered projects, approvals, action history, and agent-request
@@ -160,8 +160,9 @@ remain loopback unless the operator adds an external authentication boundary.
 polling. Docker's event stream is used when it is available.
 
 Configure `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL` for open-ended tool
-calling. `LLM_REASONING_EFFORT=none` is the safe default for function tools through
-Chat Completions, including GPT-5.6 Luna. Core and deterministic natural-language
+calling. `LLM_REASONING_EFFORT=none` remains the compatibility default. The
+LangChain agent uses an OpenAI-compatible chat model, while LangGraph supplies the
+bounded execution runtime and tool state. Core and deterministic natural-language
 operations do not require an LLM. Provider failures degrade only that query rather
 than taking down the API.
 

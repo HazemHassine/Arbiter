@@ -56,6 +56,21 @@ def test_agent_query_api(service_factory):
     assert response.json()["approval_required"] is False
 
 
+def test_frontend_api_route_contract_remains_available(service_factory):
+    schema = create_app(services=service_factory()).openapi()
+    required = {
+        "/api/v1/agent/query": "post",
+        "/api/v1/events/stream": "get",
+        "/api/v1/projects": "get",
+        "/api/v1/projects/{identifier}/prepare": "post",
+        "/api/v1/approvals": "get",
+        "/api/v1/approvals/{approval_id}/approve": "post",
+    }
+
+    for path, method in required.items():
+        assert method in schema["paths"][path]
+
+
 def test_prepare_intent_proposes_env_port_repair(service_factory, tmp_path):
     project = tmp_path / "repair-me"
     project.mkdir()

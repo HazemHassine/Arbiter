@@ -5,6 +5,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
+from dev_agent.agent.runtime import AgentRuntime, AgentRuntimeError
 from dev_agent.api.app import create_app
 from dev_agent.llm.openai_compatible import LLMProviderError, OpenAICompatibleProvider
 
@@ -79,9 +80,9 @@ def test_agent_api_degrades_instead_of_returning_500(service_factory, monkeypatc
     services.settings.llm_model = "gpt-test"
 
     async def fail(*_args, **_kwargs):
-        raise LLMProviderError("upstream rejected this request", status_code=400)
+        raise AgentRuntimeError("upstream rejected this request")
 
-    monkeypatch.setattr(OpenAICompatibleProvider, "complete", fail)
+    monkeypatch.setattr(AgentRuntime, "run", fail)
     with TestClient(create_app(services=services)) as client:
         response = client.post("/api/v1/agent/query", json={"message": "Explain my environment"})
     assert response.status_code == 200

@@ -93,6 +93,7 @@ Kafka, Kubernetes, or another background infrastructure service.
 - SQLAlchemy 2 with SQLite for persistence
 - Docker SDK for Python for daemon inspection and operations
 - Typer for the CLI
+- LangChain v1 agents backed by the LangGraph runtime for LLM orchestration
 - `httpx` for OpenAI-compatible LLM requests
 - PyYAML for Compose parsing and structured editing
 - `structlog` support for structured application logging
@@ -371,31 +372,34 @@ are inspected but not guessed or started through arbitrary commands.
 
 ## 14. Natural-language agent
 
-The natural-language endpoint combines deterministic intents with an optional LLM
-tool loop.
+The natural-language endpoint combines deterministic intents with an optional,
+graph-backed LLM agent.
 
 Common port questions, conflict questions, and preparation requests are handled
 directly by core services. They do not require an LLM.
 
-Open-ended questions use the `LLMProvider` protocol and the
-`OpenAICompatibleProvider`. The current provider calls Chat Completions, supports
-function calls, and uses configurable `reasoning_effort`. The default effort is
-`none` so GPT-5.6 Luna can use function tools through Chat Completions.
+Open-ended questions use LangChain v1's `create_agent`, which runs on LangGraph.
+`ChatOpenAI` supplies the OpenAI-compatible model integration, function calling,
+and configurable `reasoning_effort`. The resource-filtering subsystem retains its
+small strict-JSON provider because it is a single structured model call rather
+than an agent workflow.
 
-The tool registry currently gives the model narrowly scoped access to:
+The tool registry gives the model narrowly scoped access to:
 
-- list real ports;
-- find one port owner;
-- list projects;
-- detect port conflicts;
-- prepare a registered project.
+- inspect topology, projects, and connected resources;
+- inspect real ports, processes, and Docker resources;
+- inspect Dockerfiles and Make targets;
+- diagnose projects and detect port conflicts;
+- propose preparation through the existing approval pipeline.
 
-There is no generic shell tool. Tool loops are bounded by `AGENT_MAX_STEPS`.
-Malformed calls become tool errors instead of arbitrary execution. Provider HTTP
-errors, timeouts, connection failures, and malformed responses produce a safe
-`degraded` query result rather than an unhandled HTTP 500.
+There is no generic shell tool. LangChain model calls are bounded by
+`AGENT_MAX_STEPS`, and LangGraph owns tool-call state and termination. Malformed
+calls become tool errors instead of arbitrary execution. Provider HTTP errors,
+timeouts, connection failures, and malformed responses produce a safe `degraded`
+query result rather than an unhandled HTTP 500.
 
-Agent requests and their final responses are persisted in SQLite.
+Agent requests and their final responses are persisted in SQLite. The public
+`POST /api/v1/agent/query` request and response contract is unchanged.
 
 ## 15. Persistence
 

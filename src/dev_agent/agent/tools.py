@@ -1,73 +1,118 @@
 import json
-from typing import Any
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
-from dev_agent.agent.service import AgentService
+if TYPE_CHECKING:
+    from langchain_core.tools import BaseTool
+
+    from dev_agent.agent.service import AgentService
+
+
+@dataclass(frozen=True)
+class ToolSpec:
+    name: str
+    description: str
+    properties: dict[str, dict[str, Any]]
 
 
 class AgentTools:
-    def __init__(self, agent: AgentService) -> None:
+    def __init__(self, agent: "AgentService") -> None:
         self.agent = agent
 
     def definitions(self) -> list[dict[str, Any]]:
-        specs = [
-            ("topology_get", "Get the connected live workstation topology", {}),
-            (
-                "resource_inspect",
-                "Inspect one resource and all directly connected resources",
-                {"resource_type": {"type": "string"}, "resource_id": {"type": "string"}},
-            ),
-            (
-                "project_inspect",
-                "Inspect a registered project's connected workspace",
-                {"identifier": {"type": "string"}},
-            ),
-            (
-                "project_diagnose",
-                "Diagnose a registered project from observed state",
-                {"identifier": {"type": "string"}},
-            ),
-            ("list_ports", "List real listening ports and owners", {}),
-            ("find_port_owner", "Find the real owner of a TCP port", {"port": {"type": "integer"}}),
-            ("find_free_port", "Find a deterministic free host port", {"preferred_port": {"type": "integer"}}),
-            ("list_projects", "List registered projects", {}),
-            ("detect_port_conflicts", "Find duplicate registered project port claims", {}),
-            ("containers_list", "List Docker containers", {}),
-            ("container_inspect", "Inspect one Docker container", {"identifier": {"type": "string"}}),
-            ("volume_inspect", "Inspect one Docker volume", {"identifier": {"type": "string"}}),
-            ("network_inspect", "Inspect one Docker network", {"identifier": {"type": "string"}}),
-            ("processes_list", "List host processes with project and port evidence", {}),
-            ("process_inspect", "Inspect one host process", {"pid": {"type": "integer"}}),
-            (
-                "make_targets_list",
-                "List Make targets and inferred command metadata for a project",
-                {"identifier": {"type": "string"}},
-            ),
-            (
-                "dockerfile_inspect",
-                "Inspect a Dockerfile in a registered project",
-                {"identifier": {"type": "string"}, "path": {"type": "string"}},
-            ),
-            (
-                "prepare_project",
-                "Inspect a registered project and propose safe preparation actions",
-                {"identifier": {"type": "string"}},
-            ),
-        ]
         return [
             {
                 "type": "function",
                 "function": {
-                    "name": name,
-                    "description": description,
-                    "parameters": {
-                        "type": "object",
-                        "properties": properties,
-                        "required": list(properties),
-                        "additionalProperties": False,
-                    },
+                    "name": spec.name,
+                    "description": spec.description,
+                    "parameters": self._schema(spec),
                 },
             }
-            for name, description, properties in specs
+            for spec in self._specs()
+        ]
+
+    def langchain_tools(self) -> list["BaseTool"]:
+        """Expose the registry as typed LangChain tools without duplicating implementations."""
+
+        from langchain_core.tools import StructuredTool
+
+        return [
+            StructuredTool.from_function(
+                func=self._safe_runner(spec.name),
+                name=spec.name,
+                description=spec.description,
+                args_schema=self._schema(spec),
+            )
+            for spec in self._specs()
+        ]
+
+    @staticmethod
+    def _schema(spec: ToolSpec) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": spec.properties,
+            "required": list(spec.properties),
+            "additionalProperties": False,
+        }
+
+    def _safe_runner(self, name: str) -> Callable[..., Any]:
+        def run(**arguments: Any) -> Any:
+            try:
+                return self.call(name, arguments)
+            except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+                return {"error": "malformed_tool_call", "detail": str(exc)}
+
+        return run
+
+    @staticmethod
+    def _specs() -> list[ToolSpec]:
+        return [
+            ToolSpec("topology_get", "Get the connected live workstation topology", {}),
+            ToolSpec(
+                "resource_inspect",
+                "Inspect one resource and all directly connected resources",
+                {"resource_type": {"type": "string"}, "resource_id": {"type": "string"}},
+            ),
+            ToolSpec(
+                "project_inspect",
+                "Inspect a registered project's connected workspace",
+                {"identifier": {"type": "string"}},
+            ),
+            ToolSpec(
+                "project_diagnose",
+                "Diagnose a registered project from observed state",
+                {"identifier": {"type": "string"}},
+            ),
+            ToolSpec("list_ports", "List real listening ports and owners", {}),
+            ToolSpec("find_port_owner", "Find the real owner of a TCP port", {"port": {"type": "integer"}}),
+            ToolSpec(
+                "find_free_port", "Find a deterministic free host port", {"preferred_port": {"type": "integer"}}
+            ),
+            ToolSpec("list_projects", "List registered projects", {}),
+            ToolSpec("detect_port_conflicts", "Find duplicate registered project port claims", {}),
+            ToolSpec("containers_list", "List Docker containers", {}),
+            ToolSpec("container_inspect", "Inspect one Docker container", {"identifier": {"type": "string"}}),
+            ToolSpec("volume_inspect", "Inspect one Docker volume", {"identifier": {"type": "string"}}),
+            ToolSpec("network_inspect", "Inspect one Docker network", {"identifier": {"type": "string"}}),
+            ToolSpec("processes_list", "List host processes with project and port evidence", {}),
+            ToolSpec("process_inspect", "Inspect one host process", {"pid": {"type": "integer"}}),
+            ToolSpec(
+                "make_targets_list",
+                "List Make targets and inferred command metadata for a project",
+                {"identifier": {"type": "string"}},
+            ),
+            ToolSpec(
+                "dockerfile_inspect",
+                "Inspect a Dockerfile in a registered project",
+                {"identifier": {"type": "string"}, "path": {"type": "string"}},
+            ),
+            ToolSpec(
+                "prepare_project",
+                "Inspect a registered project and propose safe preparation actions",
+                {"identifier": {"type": "string"}},
+            ),
         ]
 
     def call(self, name: str, arguments: str | dict[str, Any]) -> Any:
