@@ -64,7 +64,10 @@ class ActionService:
             risk=approval.risk,
             project_id=approval.arguments.get("project_id"),
         )
-        return self.execute(spec, approval_id=approval.id)
+        try:
+            return self.execute(spec, approval_id=approval.id)
+        finally:
+            self.approvals.release_reservations(approval.id)
 
     def execute(self, spec: ActionSpec, approval_id: str | None = None) -> ActionResult:
         action_id = str(uuid4())
@@ -131,12 +134,17 @@ class ActionService:
             return result, {"verified": bool(containers) and all(item.state == "running" for item in containers)}
         if spec.action == "compose.change_port":
             project, compose_file = self._project_compose(args["project_id"])
-            result = self.editor.change_service_host_port(
+            edit = self.editor.change_service_host_port(
                 compose_file, args["service"], int(args["old_port"]), int(args["new_port"])
             )
-            self.compose.recreate_service(compose_file, args["service"])
+            try:
+                self.compose.recreate_service(compose_file, args["service"])
+            except Exception as exc:
+                restore_errors = self._restore_edits([edit], compose_file, [args["service"]])
+                detail = f"; compensation errors: {'; '.join(restore_errors)}" if restore_errors else ""
+                raise RuntimeError(f"Service recreation failed; restored configuration{detail}") from exc
             owner = self.ports.find_port_owner(int(args["new_port"]))
-            return result, {
+            return edit, {
                 "verified": bool(owner),
                 "project": project.name,
                 "new_port_owner": owner.model_dump(mode="json") if owner else None,
@@ -144,25 +152,32 @@ class ActionService:
         if spec.action == "project.resolve_ports":
             project, compose_file = self._project_compose(args["project_id"])
             changes = []
-            for change in args["changes"]:
-                if Path(change["compose_file"]).resolve() != compose_file.resolve():
-                    raise ValueError("Approved Compose path does not match registered project")
-                if change.get("env_variable"):
-                    edit = change_env_port(
-                        project.path / ".env", change["env_variable"], change["old_port"], change["new_port"]
-                    )
-                    validation = self.compose.validate(compose_file)
-                    if not validation["valid"]:
-                        shutil.copy2(edit["backup"], edit["file"])
-                        raise RuntimeError("Compose validation failed after .env edit; restored backup")
-                    changes.append(edit)
-                else:
-                    changes.append(
-                        self.editor.change_service_host_port(
-                            compose_file, change["service"], change["old_port"], change["new_port"]
+            runtime_touched_services: list[str] = []
+            try:
+                for change in args["changes"]:
+                    if Path(change["compose_file"]).resolve() != compose_file.resolve():
+                        raise ValueError("Approved Compose path does not match registered project")
+                    if change.get("env_variable"):
+                        edit = change_env_port(
+                            project.path / ".env", change["env_variable"], change["old_port"], change["new_port"]
                         )
-                    )
-                self.compose.recreate_service(compose_file, change["service"])
+                        validation = self.compose.validate(compose_file)
+                        if not validation["valid"]:
+                            shutil.copy2(edit["backup"], edit["file"])
+                            raise RuntimeError("Compose validation failed after .env edit; restored backup")
+                        changes.append(edit)
+                    else:
+                        changes.append(
+                            self.editor.change_service_host_port(
+                                compose_file, change["service"], change["old_port"], change["new_port"]
+                            )
+                        )
+                    runtime_touched_services.append(change["service"])
+                    self.compose.recreate_service(compose_file, change["service"])
+            except Exception as exc:
+                restore_errors = self._restore_edits(changes, compose_file, runtime_touched_services)
+                detail = f"; compensation errors: {'; '.join(restore_errors)}" if restore_errors else ""
+                raise RuntimeError(f"Port reconciliation failed; restored configuration{detail}") from exc
             refreshed = self.projects.refresh_project(project.id)
             states = {
                 item.compose_service: item.state
@@ -210,3 +225,17 @@ class ActionService:
         if not project.compose_files:
             raise LookupError("Project has no Compose file")
         return project, project.compose_files[0]
+
+    def _restore_edits(self, edits: list[dict], compose_file: Path, services: list[str]) -> list[str]:
+        errors: list[str] = []
+        for edit in reversed(edits):
+            try:
+                shutil.copy2(str(edit["backup"]), str(edit["file"]))
+            except OSError as exc:
+                errors.append(f"could not restore {edit.get('file')}: {exc}")
+        for service in dict.fromkeys(services):
+            try:
+                self.compose.recreate_service(compose_file, service)
+            except Exception as exc:
+                errors.append(f"could not restore service {service}: {exc}")
+        return errors

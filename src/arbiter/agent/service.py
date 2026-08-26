@@ -41,6 +41,7 @@ class AgentService:
                             "service": item["service"],
                             "old_port": item["requested_port"],
                             "new_port": item["suggested_port"],
+                            "protocol": item["protocol"],
                             "compose_file": item["source"],
                             "env_variable": item["env_variable"],
                         }

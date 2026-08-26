@@ -12,7 +12,14 @@ from sqlalchemy.engine import make_url
 
 from arbiter.agent.service import AgentService
 from arbiter.agent.tools import AgentTools
-from arbiter.persistence.tables import ActionRow, AgentRequestRow, ApprovalRow, ManagedFileBackupRow, ProjectRow
+from arbiter.persistence.tables import (
+    ActionRow,
+    AgentRequestRow,
+    ApprovalRow,
+    ManagedFileBackupRow,
+    PortReservationRow,
+    ProjectRow,
+)
 from arbiter.safety.policies import ACTION_RISKS, needs_approval
 
 
@@ -51,6 +58,7 @@ class AdminService:
         tables = {
             "projects": ProjectRow,
             "approvals": ApprovalRow,
+            "port_reservations": PortReservationRow,
             "actions": ActionRow,
             "agent_requests": AgentRequestRow,
             "managed_file_backups": ManagedFileBackupRow,

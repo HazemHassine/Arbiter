@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, String, Text
+from sqlalchemy import JSON, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from arbiter.models import utcnow
@@ -27,6 +27,16 @@ class ApprovalRow(Base):
     status: Mapped[str] = mapped_column(String(32), default="pending")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class PortReservationRow(Base):
+    __tablename__ = "port_reservations"
+    key: Mapped[str] = mapped_column(String(16), primary_key=True)
+    port: Mapped[int] = mapped_column(Integer)
+    protocol: Mapped[str] = mapped_column(String(8))
+    approval_id: Mapped[str] = mapped_column(String(36), index=True)
+    project_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
 
 
 class ActionRow(Base):

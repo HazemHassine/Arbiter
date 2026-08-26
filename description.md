@@ -329,6 +329,11 @@ Approving an action executes the stored payload. The agent cannot replace or
 modify arguments after approval. Expired, rejected, or previously approved
 requests cannot be reused.
 
+For `project.resolve_ports`, the approval transaction also reserves each proposed
+`protocol:port` pair in SQLite. The uniqueness constraint prevents concurrent
+preparation requests from holding active approvals for the same replacement.
+Reservations are released on rejection, expiration, or execution completion.
+
 The action history records:
 
 - request and project IDs
@@ -373,6 +378,10 @@ can accept a registered identifier or an explicit path and performs the followin
 9. after approval, update configuration and recreate affected services;
 10. refresh configuration and verify containers and ports.
 
+Configuration updates are compensating transactions: if validation or service
+recreation fails, Arbiter restores every edited Compose/`.env` source in reverse
+order and attempts to recreate runtime services from the restored configuration.
+
 If no conflicts exist but project startup is requested, a separate medium-risk
 Compose start approval is created. Projects without a supported startup mechanism
 are inspected but not guessed or started through arbitrary commands.
@@ -416,12 +425,13 @@ with raw HTML disabled.
 ## 15. Persistence
 
 SQLite is configured through `DATABASE_URL`, defaulting to
-`sqlite:///./dev_agent.db`.
+`sqlite:///./arbiter.db`.
 
 The schema contains:
 
 - `projects`: project registry and serialized discovery data;
 - `approvals`: immutable proposals and decisions;
+- `port_reservations`: active protocol/port claims held by reconciliation approvals;
 - `actions`: execution and verification history;
 - `agent_requests`: natural-language messages and responses.
 
@@ -703,9 +713,10 @@ the real Docker environment. It covers:
 - API health, projects, ports, Docker, approvals, and agent queries;
 - LLM reasoning configuration and degraded provider errors;
 - UI asset mounting and root redirect;
-- MCP and A2A adapter construction.
+- MCP and A2A adapter construction;
 - deterministic port reconciliation from registered and runtime evidence;
-- an opt-in live-Docker approval-gated temporary-container lifecycle.
+- property-based allocator invariants and concurrent approval reservations;
+- an opt-in live-Docker Compose reconciliation and rollback suite.
 
 Run quality checks with:
 

@@ -159,7 +159,10 @@ unless explicitly configured otherwise. Volume removal and generic shell or
 filesystem APIs do not exist. Subprocesses use fixed argument arrays, timeouts,
 and registered project paths. File edits are restricted to known configuration
 files below a registered root; `.env` editor payloads are redacted from approval
-and action-list APIs.
+and action-list APIs. Pending reconciliation approvals reserve replacement ports
+in SQLite by protocol, so concurrent preparation requests cannot approve the same
+replacement. Validation or service-recreation failures restore configuration and
+attempt to recreate affected services from the restored source.
 
 ## Configuration
 
@@ -228,9 +231,10 @@ npm run typecheck
 npm run build
 ```
 
-Tests mock system/Docker state and never mutate the host Docker environment.
-Opt-in live-Docker smoke tests cover inspection and an approval-gated lifecycle
-using one temporary labelled container:
+Tests use fake system/Docker state by default. Opt-in live-Docker tests cover
+inspection, an approval-gated container lifecycle, the complete Compose conflict
+repair workflow, and forced Compose/`.env` rollback. They create only labelled
+temporary resources and clean them up:
 
 ```bash
 ARBITER_RUN_DOCKER_TESTS=1 uv run pytest -m docker

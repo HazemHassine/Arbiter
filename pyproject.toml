@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.3", "pytest-asyncio>=0.25", "ruff>=0.9"]
+dev = ["hypothesis>=6.0", "pytest>=8.3", "pytest-asyncio>=0.25", "ruff>=0.9"]
 mcp = ["mcp>=1.2"]
 
 [project.scripts]

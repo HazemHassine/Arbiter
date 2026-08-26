@@ -39,13 +39,13 @@ until those foundations are demonstrably reliable.
 
 ## P0 — reliability and security evidence
 
-- [ ] Add a live-Docker Compose fixture that exercises the full workflow:
+- [x] Add a live-Docker Compose fixture that exercises the full workflow:
   detect conflict → propose → approve → edit → recreate one service → verify.
-- [ ] Add forced-failure live tests proving Compose and `.env` edits roll back
+- [x] Add forced-failure live tests proving Compose and `.env` edits roll back
   after validation or recreation failures.
-- [ ] Add property-based tests for allocator invariants across TCP/UDP,
+- [x] Add property-based tests for allocator invariants across TCP/UDP,
   configured range boundaries, duplicate declarations, and exhausted ranges.
-- [ ] Add concurrency tests proving two simultaneous preparation requests cannot
+- [x] Add concurrency tests proving two simultaneous preparation requests cannot
   approve the same replacement port.
 - [ ] Separate observation/API concerns from privileged Docker mutation behind a
   narrow executor interface, ideally a local Unix socket with explicit actions.
@@ -54,6 +54,12 @@ until those foundations are demonstrably reliable.
   acknowledgement that an external boundary exists.
 - [ ] Generate an API coverage inventory so every mutation route is paired with
   authorization, approval, immutable-argument, failure, and verification tests.
+
+Completed on `feat/arbiter-p0-reliability`: reconciliation edits now compensate
+after service-recreation failures, pending approvals reserve replacement ports in
+SQLite by protocol, and reservations are released on rejection, expiration, or
+execution completion. The Docker suite exercises both direct Compose and `.env`
+sources and cleans up its labelled resources.
 
 ## P1 — deepen the differentiator
 
