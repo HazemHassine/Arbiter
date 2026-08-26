@@ -2,15 +2,32 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from dev_agent.make.service import MakeService
-from dev_agent.models import ActionSpec, Risk
-from dev_agent.persistence.tables import ApprovalRow
-from dev_agent.security import redact
+from arbiter.config import Settings
+from arbiter.make.service import MakeService
+from arbiter.models import ActionSpec, Risk
+from arbiter.persistence.tables import ApprovalRow
+from arbiter.security import redact, validate_bind_host
 
 
 def test_secret_redaction_nested():
     data = {"API_KEY": "secret", "safe": {"password": "bad", "port": 8000}}
     assert redact(data) == {"API_KEY": "<redacted>", "safe": {"password": "<redacted>", "port": 8000}}
+
+
+def test_remote_bind_requires_explicit_external_auth_boundary():
+    assert validate_bind_host("127.0.0.1") == "127.0.0.1"
+    assert validate_bind_host("::1") == "::1"
+    with pytest.raises(ValueError, match="ALLOW_REMOTE_ACCESS"):
+        validate_bind_host("0.0.0.0")
+    assert validate_bind_host("0.0.0.0", allow_remote_access=True) == "0.0.0.0"
+
+
+def test_arbiter_settings_accept_legacy_host_and_port_aliases():
+    canonical = Settings(ARBITER_HOST="127.0.0.2", ARBITER_PORT=9000, _env_file=None)
+    legacy = Settings(DEV_AGENT_HOST="127.0.0.3", DEV_AGENT_PORT=9001, _env_file=None)
+
+    assert (canonical.arbiter_host, canonical.arbiter_port) == ("127.0.0.2", 9000)
+    assert (legacy.arbiter_host, legacy.arbiter_port) == ("127.0.0.3", 9001)
 
 
 def test_make_parsing_and_risk(tmp_path):

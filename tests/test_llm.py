@@ -5,9 +5,9 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from dev_agent.agent.runtime import AgentRuntime, AgentRuntimeError
-from dev_agent.api.app import create_app
-from dev_agent.llm.openai_compatible import LLMProviderError, OpenAICompatibleProvider
+from arbiter.agent.runtime import AgentRuntime, AgentRuntimeError
+from arbiter.api.app import create_app
+from arbiter.llm.openai_compatible import LLMProviderError, OpenAICompatibleProvider
 
 
 def test_chat_provider_disables_reasoning_for_function_tools():

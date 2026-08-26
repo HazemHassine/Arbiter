@@ -2,10 +2,10 @@ import json
 
 from fastapi.testclient import TestClient
 
-from dev_agent.agent.service import AgentService
-from dev_agent.agent.tools import AgentTools
-from dev_agent.api.app import create_app
-from dev_agent.models import ContainerInfo, PortOwner
+from arbiter.agent.service import AgentService
+from arbiter.agent.tools import AgentTools
+from arbiter.api.app import create_app
+from arbiter.models import ContainerInfo, PortOwner
 
 
 def test_health_port_project_and_docker_apis(service_factory, tmp_path):
@@ -16,7 +16,7 @@ def test_health_port_project_and_docker_apis(service_factory, tmp_path):
         assert client.get("/", follow_redirects=False).headers["location"] == "/ui/"
         ui = client.get("/ui/")
         assert ui.status_code == 200
-        assert "Localhost — Developer Control Plane" in ui.text
+        assert "Arbiter — Local Development Control Plane" in ui.text
         assert 'id="resource-selector"' in ui.text
         assert 'id="container-log-output"' in ui.text
         assert 'id="preview-frame"' in ui.text

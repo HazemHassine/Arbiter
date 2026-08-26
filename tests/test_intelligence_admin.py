@@ -1,8 +1,8 @@
 from fastapi.testclient import TestClient
 
-from dev_agent.api.app import create_app
-from dev_agent.llm.openai_compatible import OpenAICompatibleProvider
-from dev_agent.models import ContainerInfo, PortBinding, PortOwner
+from arbiter.api.app import create_app
+from arbiter.llm.openai_compatible import OpenAICompatibleProvider
+from arbiter.models import ContainerInfo, PortBinding, PortOwner
 
 
 def test_deterministic_resource_filter_returns_matches_and_neighbors(service_factory, tmp_path):

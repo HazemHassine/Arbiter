@@ -4,11 +4,11 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from dev_agent.api.app import create_app
-from dev_agent.dockerfile.service import DockerfileService
-from dev_agent.events.models import SystemEvent
-from dev_agent.make.service import MakeService
-from dev_agent.models import ActionSpec, ContainerInfo, PortBinding, PortOwner, Risk
+from arbiter.api.app import create_app
+from arbiter.dockerfile.service import DockerfileService
+from arbiter.events.models import SystemEvent
+from arbiter.make.service import MakeService
+from arbiter.models import ActionSpec, ContainerInfo, PortBinding, PortOwner, Risk
 
 
 def create_workspace(path: Path) -> None:

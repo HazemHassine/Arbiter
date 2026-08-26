@@ -1,7 +1,8 @@
-# Local Developer Control Plane
+# Arbiter
 
-A local-first Linux control plane for understanding and safely operating projects,
-Docker/Compose resources, host processes, ports, files, and development servers.
+Arbiter is a local-first Linux control plane for understanding and safely
+reconciling projects, Docker/Compose resources, host processes, ports, files,
+and development servers.
 It follows an explicit observe → diagnose → propose → approve → act → verify
 workflow and binds its API to `127.0.0.1` by default.
 
@@ -10,7 +11,7 @@ workflow and binds its API to `127.0.0.1` by default.
 ```bash
 cp .env.example .env
 uv sync --extra dev
-uv run dev-agent serve
+uv run arbiter serve
 curl http://127.0.0.1:8765/health
 curl http://127.0.0.1:8765/api/v1/ports
 ```
@@ -51,23 +52,25 @@ and the UI uses the same REST safety pipeline as the CLI.
 Register and prepare a project:
 
 ```bash
-uv run dev-agent register /home/user/dev/github-analysis
-uv run dev-agent prepare github-analysis
-uv run dev-agent approve APPROVAL_ID
+uv run arbiter register /home/user/dev/github-analysis
+uv run arbiter prepare github-analysis
+uv run arbiter approve APPROVAL_ID
 ```
 
-The preparation operation inspects Compose configuration and real listening
-ports. Conflicting host ports produce deterministic alternatives and a persisted
-approval. Approval executes exactly the stored arguments, backs up configuration,
-validates it, recreates only affected services, and records post-action checks.
+The preparation operation inspects Compose configuration, every registered port
+claim, and real listening ports. Conflicts produce deterministic alternatives
+that reserve both declared and observed ports, plus a persisted approval. Approval
+executes exactly the stored arguments, backs up configuration, validates it,
+recreates only affected services, and records post-action checks.
 
 ## Architecture
 
-The code under `src/dev_agent` is split into domain services:
+The code under `src/arbiter` is split into domain services:
 
 - `ports`: parses Linux `ss`, resolves processes through `/proc`, correlates
-  Docker/Compose metadata, finds predictable free ports, and detects duplicate
-  project claims.
+  Docker/Compose metadata, detects typed declaration/runtime conflicts, and builds
+  deterministic per-project reconciliation plans without creating known new
+  collisions.
 - `projects`: bounded discovery below configured roots and a refreshable SQLite
   registry. No whole-filesystem scan occurs.
 - `topology`, `system`, and `events`: generate a live, typed machine graph from
@@ -93,6 +96,7 @@ schema. Docker logs are returned on demand and are not persisted.
 curl http://127.0.0.1:8765/api/v1/ports/5432
 curl 'http://127.0.0.1:8765/api/v1/ports/free?start=3000&end=4000&count=5'
 curl http://127.0.0.1:8765/api/v1/ports/conflicts
+curl http://127.0.0.1:8765/api/v1/projects/PROJECT_ID/reconciliation-plan
 
 curl -X POST http://127.0.0.1:8765/api/v1/projects \
   -H 'Content-Type: application/json' \
@@ -162,6 +166,9 @@ and action-list APIs.
 See `.env.example`. `PROJECT_ROOTS` is a comma-separated list. Discovery examines
 each configured root and its immediate child directories only. The API host should
 remain loopback unless the operator adds an external authentication boundary.
+Arbiter refuses a non-loopback bind by default; `ALLOW_REMOTE_ACCESS=true` is an
+explicit escape hatch, not a substitute for authentication. Legacy
+`DEV_AGENT_HOST` and `DEV_AGENT_PORT` variables remain accepted during migration.
 
 `OBSERVATION_INTERVAL_SECONDS` defaults to `3` and controls host process/port
 polling. Docker's event stream is used when it is available.
@@ -176,18 +183,18 @@ than taking down the API.
 ## CLI
 
 ```bash
-dev-agent ports
-dev-agent ports --free 3000:4000 --count 10
-dev-agent projects --scan
-dev-agent inspect github-analysis
-dev-agent ask 'Which projects have conflicting ports?'
-dev-agent containers
-dev-agent topology
-dev-agent topology github-analysis
-dev-agent processes
-dev-agent runtimes
-dev-agent logs postgres --tail 100
-dev-agent disk
+arbiter ports
+arbiter ports --free 3000:4000 --count 10
+arbiter projects --scan
+arbiter inspect github-analysis
+arbiter ask 'Which projects have conflicting ports?'
+arbiter containers
+arbiter topology
+arbiter topology github-analysis
+arbiter processes
+arbiter runtimes
+arbiter logs postgres --tail 100
+arbiter disk
 ```
 
 ## MCP and A2A
@@ -196,11 +203,12 @@ MCP is a real optional stdio adapter using the official Python MCP package:
 
 ```bash
 uv sync --extra mcp
-uv run dev-agent mcp
+uv run arbiter mcp
 ```
 
 It exposes port inspection/allocation, topology and resource inspection, process
-listing, project listing and high-level `dev_environment_prepare_project`, plus
+listing, project listing, a read-only reconciliation plan, and high-level
+`arbiter_prepare_project`, plus
 Docker container inspection. The A2A module supplies an Agent Card-shaped
 capability description and a task adapter mapping preparation and diagnosis onto
 the same core. A protocol SDK is not a mandatory dependency because the Python
@@ -214,14 +222,19 @@ uv run pytest
 uv run ruff check .
 
 # Rebuild the statically exported Next.js control panel
-cd src/dev_agent/ui
+cd src/arbiter/ui
 npm install
 npm run typecheck
 npm run build
 ```
 
 Tests mock system/Docker state and never mutate the host Docker environment.
-Optional real-environment smoke tests belong under the `docker` pytest marker.
+Opt-in live-Docker smoke tests cover inspection and an approval-gated lifecycle
+using one temporary labelled container:
+
+```bash
+ARBITER_RUN_DOCKER_TESTS=1 uv run pytest -m docker
+```
 
 ## Practical limitations
 

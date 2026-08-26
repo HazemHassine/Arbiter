@@ -1,8 +1,8 @@
-# Local Development Environment Agent — Detailed Description
+# Arbiter — Detailed Description
 
 ## 1. Project summary
 
-The Local Development Environment Agent is a local-first Linux operations tool for
+Arbiter is a local-first Linux operations tool for
 understanding and controlling a developer workstation. Its primary purpose is to
 coordinate ports across many simultaneously running projects, Docker containers,
 Docker Compose stacks, and local processes.
@@ -103,11 +103,11 @@ Kafka, Kubernetes, or another background infrastructure service.
 - optional official Python MCP package for the MCP adapter
 
 The browser UI has no Node build step, framework runtime, or CDN dependency. Its
-assets are packaged under `src/dev_agent/ui` and served by FastAPI.
+assets are packaged under `src/arbiter/ui` and served by FastAPI.
 
 ## 5. Core domain models
 
-The shared Pydantic models are defined in `src/dev_agent/models.py`.
+The shared Pydantic models are defined in `src/arbiter/models.py`.
 
 ### `PortBinding`
 
@@ -153,7 +153,7 @@ The port subsystem is the central feature of the project.
 
 ### Linux scanning
 
-`src/dev_agent/ports/scanner.py` runs `ss -H -lntu -p` using a fixed argument
+`src/arbiter/ports/scanner.py` runs `ss -H -lntu -p` using a fixed argument
 array and parses TCP and UDP listeners. It handles IPv4 and IPv6 endpoints and
 extracts process names and PIDs where the operating system exposes them.
 
@@ -189,6 +189,13 @@ with runtime owners. A conflict can therefore represent either:
 - multiple projects claiming the same host port; or
 - one project claiming a port currently owned by an unrelated process/container.
 
+`PortService.plan_port_reconciliation()` produces a typed, read-only plan for one
+project. It distinguishes another project's declaration, a duplicate declaration
+inside the target project, and unrelated runtime ownership. Alternative selection
+reserves every registered declaration and observed runtime binding for the same
+protocol before choosing the next deterministic port. Each change retains the
+service, Compose source, and controlling `.env` variable when present.
+
 ## 7. Project discovery and registry
 
 Projects may be registered explicitly or discovered under configured
@@ -216,7 +223,7 @@ redacted.
 
 ## 8. Docker integration
 
-`src/dev_agent/docker/service.py` connects with `docker.from_env()` and verifies
+`src/arbiter/docker/service.py` connects with `docker.from_env()` and verifies
 daemon connectivity before use.
 
 Implemented container capabilities include:
@@ -449,23 +456,23 @@ Docker. Internal tracebacks are not intentionally returned as API response bodie
 
 ## 17. Command-line interface
 
-The `dev-agent` Typer application exposes:
+The `arbiter` Typer application exposes:
 
 ```text
-dev-agent serve
-dev-agent ask "what is using port 5432?"
-dev-agent ports
-dev-agent ports --free 3000:4000 --count 10
-dev-agent projects
-dev-agent projects --scan
-dev-agent register /path/to/project
-dev-agent inspect project-name
-dev-agent prepare project-name
-dev-agent containers
-dev-agent logs container-name --tail 200
-dev-agent disk
-dev-agent approve APPROVAL_ID
-dev-agent mcp
+arbiter serve
+arbiter ask "what is using port 5432?"
+arbiter ports
+arbiter ports --free 3000:4000 --count 10
+arbiter projects
+arbiter projects --scan
+arbiter register /path/to/project
+arbiter inspect project-name
+arbiter prepare project-name
+arbiter containers
+arbiter logs container-name --tail 200
+arbiter disk
+arbiter approve APPROVAL_ID
+arbiter mcp
 ```
 
 The CLI prints structured JSON for machine-readable operations and calls the same
@@ -480,7 +487,8 @@ The optional stdio MCP server exposes seven tools:
 - `ports_find_free`
 - `ports_detect_conflicts`
 - `projects_list`
-- `dev_environment_prepare_project`
+- `arbiter_prepare_project`
+- `project_reconciliation_plan`
 - `docker_list_containers`
 
 The high-level preparation tool is intended for coding agents that need a local
@@ -492,7 +500,9 @@ REST remains the primary A2A-compatible task transport in this version.
 
 ## 19. Security boundaries
 
-The server binds to `127.0.0.1` by default. Important boundaries include:
+The server binds to `127.0.0.1` by default and rejects non-loopback binding unless
+`ALLOW_REMOTE_ACCESS=true` explicitly acknowledges an external authentication
+boundary. Important boundaries include:
 
 - no arbitrary shell API;
 - no generic filesystem read or write API;
@@ -509,7 +519,7 @@ The server binds to `127.0.0.1` by default. Important boundaries include:
 - no automatic persistent-volume removal.
 
 The API should remain on loopback unless an external authentication and transport
-security layer is added.
+security layer is added. The escape hatch is not itself authentication.
 
 ## 20. Browser control panel
 
@@ -659,7 +669,7 @@ Normal setup:
 ```bash
 cp .env.example .env
 uv sync --extra dev --extra mcp
-uv run dev-agent serve
+uv run arbiter serve
 ```
 
 For the current workstation, `uv` is installed under pyenv Python 3.13.3 while the
@@ -667,7 +677,7 @@ project environment uses Python 3.12. Run:
 
 ```bash
 PYENV_VERSION=3.13.3 uv sync --python 3.12 --extra dev --extra mcp
-PYENV_VERSION=3.13.3 uv run --python 3.12 dev-agent serve
+PYENV_VERSION=3.13.3 uv run --python 3.12 arbiter serve
 ```
 
 Then open:
@@ -694,6 +704,8 @@ the real Docker environment. It covers:
 - LLM reasoning configuration and degraded provider errors;
 - UI asset mounting and root redirect;
 - MCP and A2A adapter construction.
+- deterministic port reconciliation from registered and runtime evidence;
+- an opt-in live-Docker approval-gated temporary-container lifecycle.
 
 Run quality checks with:
 

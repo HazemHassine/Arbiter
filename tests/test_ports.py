@@ -1,5 +1,5 @@
-from dev_agent.models import PortOwner
-from dev_agent.ports.scanner import parse_ss
+from arbiter.models import PortOwner
+from arbiter.ports.scanner import parse_ss
 
 
 def test_parse_ss_ipv4_ipv6_and_process():

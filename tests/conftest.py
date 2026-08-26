@@ -2,9 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from dev_agent.config import Settings
-from dev_agent.models import ContainerInfo
-from dev_agent.services import build_services
+from arbiter.config import Settings
+from arbiter.models import ContainerInfo
+from arbiter.services import build_services
 
 
 class FakeScanner:

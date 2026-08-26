@@ -3,9 +3,9 @@ from pathlib import Path
 import pytest
 import yaml
 
-from dev_agent.compose.editor import ComposeEditor, change_env_port
-from dev_agent.compose.parser import inspect_compose, parse_port
-from dev_agent.projects.discovery import discover_projects
+from arbiter.compose.editor import ComposeEditor, change_env_port
+from arbiter.compose.parser import inspect_compose, parse_port
+from arbiter.projects.discovery import discover_projects
 
 
 def test_compose_port_formats_and_environment(tmp_path):
