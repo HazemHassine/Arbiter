@@ -14,7 +14,7 @@ export default function HomePage() {
           Read the documentation
         </Link>
         <a
-          href="https://github.com/HazemHassine/dev-environment-agent"
+          href="https://github.com/HazemHassine/Arbiter"
           className="rounded-lg border px-5 py-3 font-medium"
         >
           View on GitHub
