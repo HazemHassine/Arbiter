@@ -6,6 +6,11 @@ and development servers.
 It follows an explicit observe → diagnose → propose → approve → act → verify
 workflow and binds its API to `127.0.0.1` by default.
 
+Development requires Linux, Python 3.12, and
+[uv](https://docs.astral.sh/uv/). Node.js 20.19 or newer is required only when
+rebuilding the control panel or documentation. Docker is optional unless you
+need container inspection or the live-Docker test suite.
+
 ## Quick start
 
 ```bash
@@ -228,6 +233,12 @@ uv run ruff check .
 cd src/arbiter/ui
 npm install
 npm run typecheck
+npm run build
+
+# Check and build the standalone documentation site
+cd ../../../docs
+npm install
+npm run types:check
 npm run build
 ```
 

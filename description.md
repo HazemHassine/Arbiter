@@ -534,32 +534,28 @@ security layer is added. The escape hatch is not itself authentication.
 ## 20. Browser control panel
 
 The control panel is available at `http://127.0.0.1:8765`. FastAPI redirects `/`
-to `/ui/` and serves the bundled assets directly.
+to `/ui/` and serves the bundled static export directly.
 
 ### Visual design
 
-The interface uses a dark operational-console aesthetic with cyan status accents,
-compact monospaced metadata, bordered cards, live badges, subtle grid textures,
-and restrained animation. It is designed to communicate system state rather than
-look like a generic chat application.
+The interface uses a flat product-console design with light and dark themes,
+Radix icons, compact status indicators, and an explicit theme toggle. The sidebar
+can collapse on desktop and becomes a slide-out menu on smaller screens. Tables
+remain horizontally scrollable and card layouts collapse as the viewport narrows.
 
-The desktop layout uses a persistent left sidebar, sticky header, and responsive
-content grid. On small screens the sidebar becomes a slide-out menu, tables become
-horizontally scrollable, cards collapse to a single column, and action controls
-wrap for touch use.
-
-All dynamic values inserted into HTML are escaped. The UI has no direct access to
-Docker or the filesystem; every operation goes through the REST API.
+The browser has no direct Docker or filesystem access. Every operation goes
+through the REST API and the same approval and verification pipeline as the CLI.
 
 ### Sidebar and global status
 
-The sidebar provides navigation to Overview, Ask Agent, Ports, Projects,
-Containers, Docker, Approvals, and Action History. Count badges show current port,
-project, container, and pending-approval totals.
+The sidebar groups Overview, Workspaces, and Topology under **Workspace**;
+Observability, Containers, Processes, and Ports under **Runtime**; Files, Docker
+resources, Registry, and Ask agent under **Manage**; and Approvals, Audit log,
+Admin, and Settings under **Safety**.
 
-The footer reports whether the local agent is reachable and links to API
-documentation. The top bar shows the current section, last synchronization time,
-a refresh action, and a global Ask Agent button.
+The top bar shows synchronization and live state, theme and refresh controls,
+resource search, and a global **Ask Arbiter** action. The command palette opens
+with `Cmd+K` or `Ctrl+K`.
 
 ### Overview screen
 
@@ -579,12 +575,10 @@ One unavailable subsystem does not prevent other cards from rendering.
 
 ### Ask Agent screen
 
-This screen provides a conversation console with suggested prompts and an explicit
-safety notice. Submitted questions are sent to `/api/v1/agent/query`.
-
-The response displays the agent's concise message and structured observations.
-When an agent operation creates an approval, the UI alerts the user and updates
-the approval count. It does not automatically approve the action.
+Responses stream as GitHub-flavored Markdown with typed execution events for
+routing, model phases, tool calls, redacted arguments, evidence, and errors. The
+trace never exposes private model chain-of-thought. Proposed mutations still
+become separate approvals and are never auto-approved by the UI.
 
 ### Ports screen
 
@@ -597,7 +591,7 @@ The port view provides:
 - a detailed ownership table containing host, protocol, owner, PID/container ID,
   project/service, source, and state.
 
-### Projects screen
+### Workspaces and Registry screens
 
 Projects can be registered by explicit path or discovered by scanning configured
 roots. Each project card shows service, port, and Compose-file counts.
@@ -615,6 +609,11 @@ Project actions include:
 The container table displays name, shortened ID, image, state, health, published
 ports, and Compose ownership. Users can view the last 200 log lines, inspect raw
 one-shot statistics, and propose start, stop, or restart actions.
+
+The separate Observability screen combines the SSE event stream with bounded
+container logs, one-shot metrics, filtering and pause controls, and localhost
+application previews. Topology and Processes views expose the live resource graph
+and host runtime evidence.
 
 ### Docker screen
 
@@ -640,7 +639,7 @@ For pending approvals the user can:
 The result is displayed after execution. Failed or unverified actions open a
 detailed result dialog rather than being presented as successful.
 
-### Action History screen
+### Audit Log screen
 
 The audit screen lists action type, risk, status, verification status, action ID,
 and request ID. It supports all/completed/failed filtering and opens the full
@@ -657,19 +656,23 @@ errors, and completed decisions without hiding detailed verification data.
 The `.env.example` file documents the supported settings:
 
 ```env
-DEV_AGENT_HOST=127.0.0.1
-DEV_AGENT_PORT=8765
-DATABASE_URL=sqlite:///./dev_agent.db
+ARBITER_HOST=127.0.0.1
+ARBITER_PORT=8765
+ALLOW_REMOTE_ACCESS=false
+DATABASE_URL=sqlite:///./arbiter.db
 PROJECT_ROOTS=/home/user/dev
+PROJECT_SCAN_DEPTH=4
 LLM_BASE_URL=https://api.openai.com/v1
 LLM_API_KEY=
 LLM_MODEL=
 LLM_REASONING_EFFORT=none
+FILTER_LLM_MODEL=gpt-5.4-nano
 AGENT_MAX_STEPS=12
 AUTO_APPROVE_READ_ONLY=true
 AUTO_APPROVE_LOW_RISK=false
 DEFAULT_PORT_SEARCH_RANGE_START=3000
 DEFAULT_PORT_SEARCH_RANGE_END=9999
+OBSERVATION_INTERVAL_SECONDS=3
 ```
 
 ## 22. Running the application
@@ -680,14 +683,6 @@ Normal setup:
 cp .env.example .env
 uv sync --extra dev --extra mcp
 uv run arbiter serve
-```
-
-For the current workstation, `uv` is installed under pyenv Python 3.13.3 while the
-project environment uses Python 3.12. Run:
-
-```bash
-PYENV_VERSION=3.13.3 uv sync --python 3.12 --extra dev --extra mcp
-PYENV_VERSION=3.13.3 uv run --python 3.12 arbiter serve
 ```
 
 Then open:
@@ -721,8 +716,8 @@ the real Docker environment. It covers:
 Run quality checks with:
 
 ```bash
-PYENV_VERSION=3.13.3 uv run --python 3.12 pytest
-PYENV_VERSION=3.13.3 uv run --python 3.12 ruff check .
+uv run pytest
+uv run ruff check .
 ```
 
 ## 24. Current limitations and extension points

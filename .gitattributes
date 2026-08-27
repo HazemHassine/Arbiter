@@ -1,0 +1,2 @@
+# Next.js emits minified single-line assets whose whitespace is build-controlled.
+src/arbiter/ui/out/** -whitespace

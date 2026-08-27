@@ -1,99 +1,108 @@
 ---
 title: UI Features & Usage
-description: Control Panel usage and features
+description: Arbiter control panel usage and features
 ---
 
 # Browser Control Panel
 
-The control panel is available at `http://127.0.0.1:8765`. FastAPI redirects `/` to `/ui/` and serves the bundled assets directly.
+The control panel is available at `http://127.0.0.1:8765`. FastAPI redirects
+`/` to `/ui/` and serves the bundled static export directly, so production use
+does not require a separate Node.js server.
 
-## Visual Design
+## Interface
 
-The interface uses a dark operational-console aesthetic with cyan status accents, compact monospaced metadata, bordered cards, live badges, subtle grid textures, and restrained animation. It is designed to communicate system state rather than look like a generic chat application.
+Arbiter uses a flat, responsive product-console layout with light and dark
+themes, Radix icons, compact status indicators, and an explicit theme toggle.
+The sidebar can collapse on desktop and becomes a slide-out menu on smaller
+screens. Tables remain horizontally scrollable and card layouts collapse as the
+viewport narrows.
 
-The desktop layout uses a persistent left sidebar, sticky header, and responsive content grid. On small screens the sidebar becomes a slide-out menu, tables become horizontally scrollable, cards collapse to a single column, and action controls wrap for touch use.
+All operations go through the REST API. The browser has no direct Docker or
+filesystem access, and it cannot bypass Arbiter's approval and verification
+pipeline.
 
-All dynamic values inserted into HTML are escaped. The UI has no direct access to Docker or the filesystem; every operation goes through the REST API.
+## Navigation
 
-## Sidebar and Global Status
+The sidebar groups the application into four areas:
 
-The sidebar provides navigation to Overview, Ask Agent, Ports, Projects, Containers, Docker, Approvals, and Action History. Count badges show current port, project, container, and pending-approval totals.
+- **Workspace:** Overview, Workspaces, and Topology.
+- **Runtime:** Observability, Containers, Processes, and Ports.
+- **Manage:** Files, Docker resources, Registry, and Ask agent.
+- **Safety:** Approvals, Audit log, Admin, and Settings.
 
-The footer reports whether the local agent is reachable and links to API documentation. The top bar shows the current section, last synchronization time, a refresh action, and a global Ask Agent button.
+The top bar shows synchronization state, live status, theme controls, refresh,
+resource search, and a direct **Ask Arbiter** action. The command palette opens
+with `Cmd+K` or `Ctrl+K`.
 
-## Screens Overview
+## Workspace and Runtime
 
-### Overview
+### Overview and Workspaces
 
-The overview is an operational dashboard containing:
+The overview summarizes listeners, registered projects, containers, approvals,
+host capacity, recent activity, and quick actions. Workspace views connect
+registered and runtime-discovered projects with their Compose services and
+resource evidence.
 
-- listening-port count and unique host-port count;
-- registered-project count;
-- running and total container counts;
-- pending-approval count;
-- a live sample of port owners;
-- disk and memory usage gauges;
-- a compact registered-project list;
-- a quick project-preparation selector.
+### Topology
 
-The dashboard loads Linux, Docker, SQLite, and system-resource data concurrently. One unavailable subsystem does not prevent other cards from rendering.
+The topology canvas links projects, Compose files and services, containers,
+images, volumes, networks, ports, host processes, Dockerfiles, and Make targets.
+It supports zoom and fit controls, project scoping, connected-path focus, local
+search, and strict natural-language filtering.
+
+### Observability
+
+The observability view combines the SSE activity stream with bounded container
+logs, one-shot metrics, filtering and pause controls, and localhost application
+previews. Logs and metrics are fetched on demand and are not persisted as
+authoritative state.
+
+### Containers, Processes, and Ports
+
+- Containers show state, health, image, published ports, Compose ownership,
+  bounded logs, and metrics. Lifecycle actions create approval requests.
+- Processes show host runtime evidence and listening ports.
+- Ports support ownership search, conflict inspection, and deterministic free
+  port suggestions.
+
+## Management
+
+### Files
+
+The editor is restricted to known configuration files inside explicitly
+registered projects. Saves show a diff, validate content, require approval when
+appropriate, create a backup, and support rollback and undo.
+
+### Docker Resources
+
+Docker views cover disk usage, images, volumes, and networks. Destructive
+operations are proposals only; execution remains behind the safety workflow.
+
+### Registry
+
+Projects can be registered by explicit path or discovered below configured
+roots. Each project can be inspected, diagnosed, prepared for conflicts,
+started, stopped, restarted, or unregistered without deleting its files.
 
 ### Ask Agent
 
-This screen provides a conversation console with suggested prompts and an explicit safety notice. Submitted questions are sent to `/api/v1/agent/query`.
+Agent responses stream as GitHub-flavored Markdown alongside typed execution
+events for routing, model phases, tool calls, redacted arguments, evidence, and
+errors. The trace never exposes private model chain-of-thought. Any proposed
+mutation still becomes a separate approval.
 
-The response displays the agent's concise message and structured observations. When an agent operation creates an approval, the UI alerts the user and updates the approval count. It does not automatically approve the action.
+## Safety and Administration
 
-### Ports
+### Approvals and Audit Log
 
-The port view provides:
+Pending approvals show the exact action, immutable arguments, risk level,
+summary, and expiration. Operators can reject a request or approve and execute
+the stored payload. The audit log keeps action and verification outcomes
+separate so an operation is never presented as successful when verification
+failed.
 
-- filtering by port, process, container, project, service, or source;
-- a conflict-status card;
-- configurable free-port range and count fields;
-- copyable free-port results;
-- a detailed ownership table containing host, protocol, owner, PID/container ID, project/service, source, and state.
+### Admin and Settings
 
-### Projects
-
-Projects can be registered by explicit path or discovered by scanning configured roots. Each project card shows service, port, and Compose-file counts.
-
-Project actions include:
-
-- inspect project metadata;
-- show diagnosis, redacted environment, and Make targets;
-- prepare and resolve conflicts;
-- start, stop, and restart through approvals;
-- unregister without deleting project files.
-
-### Containers
-
-The container table displays name, shortened ID, image, state, health, published ports, and Compose ownership. Users can view the last 200 log lines, inspect raw one-shot statistics, and propose start, stop, or restart actions.
-
-### Docker
-
-Tabbed Docker views provide:
-
-- disk usage summary;
-- images with tags, size, use status, and removal proposal;
-- volumes with driver, mountpoint, current users, and destructive removal proposal for unused volumes;
-- networks with driver, scope, member list, and detailed inspection.
-
-### Approvals
-
-The approvals page is the human safety gate. Each card shows risk, action summary, action name, expiration time, and current status.
-
-For pending approvals the user can:
-
-- reject the proposal; or
-- choose **Approve & execute**, confirm the decision, and execute the exact stored action.
-
-The result is displayed after execution. Failed or unverified actions open a detailed result dialog rather than being presented as successful.
-
-### Action History
-
-The audit screen lists action type, risk, status, verification status, action ID, and request ID. It supports all/completed/failed filtering and opens the full stored action record for inspection.
-
-## Dialogs and Notifications
-
-The UI uses modal dialogs for project inspection, logs, metrics, approval details, and operation results. Toast messages report successful refreshes, proposals, errors, and completed decisions without hiding detailed verification data.
+Admin surfaces rolling API latency, LLM usage, event-pipeline state,
+process/database health, the agent harness, and safety policy. Settings explains
+the active local configuration and the boundaries around remote exposure.

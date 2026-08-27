@@ -1,9 +1,9 @@
 ---
 title: Introduction
-description: Local Developer Control Plane Documentation
+description: Arbiter local development control plane documentation
 ---
 
-# Local Developer Control Plane
+# Arbiter
 
 A local-first Linux control plane for understanding and safely operating projects, Docker/Compose resources, host processes, ports, files, and development servers. It follows an explicit observe → diagnose → propose → approve → act → verify workflow and binds its API to `127.0.0.1` by default.
 
@@ -12,7 +12,7 @@ A local-first Linux control plane for understanding and safely operating project
 ```bash
 cp .env.example .env
 uv sync --extra dev
-uv run dev-agent serve
+uv run arbiter serve
 curl http://127.0.0.1:8765/health
 curl http://127.0.0.1:8765/api/v1/ports
 ```
@@ -36,9 +36,9 @@ Docker resources, command search, port tracing, and the approval-protected proje
 ## Register and prepare a project
 
 ```bash
-uv run dev-agent register /home/user/dev/github-analysis
-uv run dev-agent prepare github-analysis
-uv run dev-agent approve APPROVAL_ID
+uv run arbiter register /home/user/dev/github-analysis
+uv run arbiter prepare github-analysis
+uv run arbiter approve APPROVAL_ID
 ```
 
 The preparation operation inspects Compose configuration and real listening ports. Conflicting host ports produce deterministic alternatives and a persisted approval. Approval executes exactly the stored arguments, backs up configuration, validates it, recreates only affected services, and records post-action checks.

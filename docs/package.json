@@ -1,10 +1,13 @@
 {
-  "name": "docs",
-  "version": "0.0.22",
+  "name": "arbiter-docs",
+  "version": "0.4.0",
   "private": true,
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "scripts": {
-    "build": "next build",
-    "dev": "next dev",
+    "build": "next build --webpack",
+    "dev": "next dev --webpack",
     "start": "next start",
     "types:check": "next typegen && tsc --noEmit"
   },

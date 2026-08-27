@@ -46,8 +46,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# The static `src/dev_agent/ui/out/` export is intentionally bundled and tracked.
-src/arbiter/ui/out/_next/
+# The static `src/arbiter/ui/out/` export is intentionally bundled and tracked.
 
 # Editors and operating systems
 .idea/
@@ -60,4 +59,3 @@ Thumbs.db
 
 # Local planning notes
 next_steps.md
-description.md

@@ -1,45 +1,37 @@
-# docs
+# Arbiter documentation
 
-This is a Next.js application generated with
-[Create Fumadocs](https://github.com/fuma-nama/fumadocs).
+This directory contains the standalone Next.js and Fumadocs documentation site
+for Arbiter.
 
-Run development server:
+## Development
 
 ```bash
+npm install
 npm run dev
-# or
-pnpm dev
-# or
-yarn dev
 ```
 
-Open http://localhost:3000 with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). The Arbiter control panel
+is a separate bundled application served by the Python API at
+[http://127.0.0.1:8765](http://127.0.0.1:8765).
 
-## Explore
+Before committing documentation changes, run:
 
-In the project, you can see:
+```bash
+npm run types:check
+npm run build
+```
 
-- `lib/source.ts`: Code for content source adapter, [`loader()`](https://fumadocs.dev/docs/headless/source-api) provides the interface to access your content.
-- `lib/layout.shared.tsx`: Shared options for layouts, optional but preferred to keep.
+Set `NEXT_PUBLIC_DOCS_URL` to the deployed documentation origin when building
+outside local development. It defaults to `http://localhost:3000`.
 
-| Route                     | Description                                            |
-| ------------------------- | ------------------------------------------------------ |
-| `app/(home)`              | The route group for your landing page and other pages. |
-| `app/docs`                | The documentation layout and pages.                    |
-| `app/api/search/route.ts` | The Route Handler for search.                          |
+## Structure
 
-### Fumadocs MDX
+- `content/docs/` contains the MDX pages.
+- `source.config.ts` defines the Fumadocs collections.
+- `src/lib/source.ts` adapts generated content for navigation, search, and LLM
+  text routes.
+- `src/app/docs/` contains the documentation layout and page routes.
+- `src/app/api/search/route.ts` provides the search endpoint.
 
-Collections are defined with the [Macro API](https://fumadocs.dev/docs/mdx/macro) in `lib/source.ts`.
-
-Read the [Introduction](https://fumadocs.dev/docs/mdx) for further details.
-
-## Learn More
-
-To learn more about Next.js and Fumadocs, take a look at the following
-resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js
-  features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-- [Fumadocs](https://fumadocs.dev) - learn about Fumadocs
+See the [Fumadocs documentation](https://fumadocs.dev/docs) for framework
+details.

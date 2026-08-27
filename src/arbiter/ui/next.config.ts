@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
   assetPrefix: "/ui",
   trailingSlash: true,
   poweredByHeader: false,
+  generateBuildId: async () => "arbiter-ui-0.4.0",
 };
 
 export default nextConfig;
