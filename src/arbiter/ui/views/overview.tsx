@@ -31,7 +31,7 @@ export function OverviewView({ onNavigate, refreshKey }: { onNavigate: (view: st
       <Panel className="hero-card">
         <div className="hero-identity">
           <span className="hero-orbit"><Sparkles /></span>
-          <div><span className="hero-kicker">Local environment arbiter</span><h2>Understand before changing</h2><p>Correlating host processes, Docker, Compose, ports, and project configuration.</p></div>
+          <div><span className="hero-kicker">Local environment arbiter</span><h2>System Overview</h2><p>Disclaimer: Use with caution. Ensure you have the necessary approvals before modifying system states.</p></div>
         </div>
         <div className="hero-status"><StatusBadge value={error ? "degraded" : "ready"} /><span><small>Scope</small><strong>Loopback only</strong></span><span><small>Mode</small><strong>Observe first</strong></span></div>
       </Panel>
