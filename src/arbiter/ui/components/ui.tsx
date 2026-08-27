@@ -1,8 +1,8 @@
 "use client";
 
 import type { ButtonHTMLAttributes, ReactNode } from "react";
-import { AlertTriangle, Box, CircleHelp, Container, FileCode2, Folder, Network, Radio, Route, Terminal, Wrench } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { CubeIcon as AlertTriangle, CubeIcon as Box, QuestionMarkCircledIcon as CircleHelp, BoxIcon as Container, CodeIcon as FileCode2, Link2Icon as Folder, Share2Icon as Network, RadiobuttonIcon as Radio, MagnifyingGlassIcon as Route, CodeIcon as Terminal, MixerHorizontalIcon as Wrench } from "@radix-ui/react-icons";
+import * as React from "react";
 
 import { classes, statusTone } from "@/lib/format";
 
@@ -55,7 +55,7 @@ export function StatusBadge({ value, dot = true }: { value: unknown; dot?: boole
   );
 }
 
-export function MetricCard({ label, value, note, icon: Icon, tone = "blue" }: { label: string; value: ReactNode; note: ReactNode; icon: LucideIcon; tone?: string }) {
+export function MetricCard({ label, value, note, icon: Icon, tone = "blue" }: { label: string; value: ReactNode; note: ReactNode; icon: React.FC<any>; tone?: string }) {
   return (
     <article className="metric-card">
       <div className={classes("metric-icon", tone)}><Icon /></div>
@@ -68,7 +68,7 @@ export function MetricCard({ label, value, note, icon: Icon, tone = "blue" }: { 
   );
 }
 
-export function EmptyState({ title = "Nothing here yet", description, icon: Icon = CircleHelp }: { title?: string; description?: string; icon?: LucideIcon }) {
+export function EmptyState({ title = "Nothing here yet", description, icon: Icon = CircleHelp }: { title?: string; description?: string; icon?: React.FC<any> }) {
   return (
     <div className="empty-state">
       <Icon />
@@ -97,7 +97,7 @@ export function Button({ className, variant = "secondary", children, ...props }:
   return <button className={classes("button", variant, className)} type="button" {...props}>{children}</button>;
 }
 
-const resourceIcons: Record<string, LucideIcon> = {
+const resourceIcons: Record<string, React.FC<any>> = {
   project: Folder,
   compose_project: Network,
   compose_service: Box,

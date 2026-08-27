@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, ArrowRight, Box, Container as ContainerIcon, FolderKanban, Gauge, Route, ShieldCheck, Sparkles } from "lucide-react";
+import { ActivityLogIcon as Activity, ArrowRightIcon as ArrowRight, CubeIcon as Box, BoxIcon as ContainerIcon, LayersIcon as FolderKanban, DashboardIcon as Gauge, MagnifyingGlassIcon as Route, LockClosedIcon as ShieldCheck, StarIcon as Sparkles } from "@radix-ui/react-icons";
 
 import { useResource } from "@/hooks/use-resource";
 import { formatDate } from "@/lib/format";
@@ -31,14 +31,14 @@ export function OverviewView({ onNavigate, refreshKey }: { onNavigate: (view: st
       <Panel className="hero-card">
         <div className="hero-identity">
           <span className="hero-orbit"><Sparkles /></span>
-          <div><span className="hero-kicker">Local environment arbiter</span><h2>Understand before changing</h2><p>Correlating host processes, Docker, Compose, ports, and project configuration.</p></div>
+          <div><span className="hero-kicker">Local environment arbiter</span><h2>System Overview</h2><p>Disclaimer: Use with caution. Ensure you have the necessary approvals before modifying system states.</p></div>
         </div>
         <div className="hero-status"><StatusBadge value={error ? "degraded" : "ready"} /><span><small>Scope</small><strong>Loopback only</strong></span><span><small>Mode</small><strong>Observe first</strong></span></div>
       </Panel>
 
       <div className="metric-grid">
         <MetricCard label="Listening ports" value={ports.loading ? "—" : ports.data.length} note="Observed on the host" icon={Route} tone="blue" />
-        <MetricCard label="Workspaces" value={projects.loading ? "—" : projects.data.length} note="Registered roots" icon={FolderKanban} tone="purple" />
+        <MetricCard label="Workspaces" value={projects.loading ? "—" : projects.data.length} note="Registered roots" icon={FolderKanban} tone="amber" />
         <MetricCard label="Running containers" value={containers.loading ? "—" : running} note={`${containers.data.length} known to Docker`} icon={ContainerIcon} tone="green" />
         <MetricCard label="Pending approvals" value={approvals.loading ? "—" : pending} note="Waiting at the safety gate" icon={ShieldCheck} tone={pending ? "amber" : "green"} />
       </div>

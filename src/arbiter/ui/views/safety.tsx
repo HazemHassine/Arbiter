@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Clock3, History, RefreshCw, ShieldAlert, X } from "lucide-react";
+import { CheckIcon as Check, ClockIcon as Clock3, UpdateIcon as History, ReloadIcon as RefreshCw, ExclamationTriangleIcon as ShieldAlert, Cross2Icon as X } from "@radix-ui/react-icons";
 import { useMemo, useState } from "react";
 
 import { Button, EmptyState, ErrorNotice, LoadingRows, PageHeader, Panel, StatusBadge } from "@/components/ui";

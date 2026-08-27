@@ -1,33 +1,7 @@
 "use client";
 
-import {
-  Activity,
-  Archive,
-  Bot,
-  Box,
-  CheckCircle2,
-  ChevronLeft,
-  Command,
-  Container,
-  ExternalLink,
-  FileCode2,
-  FolderKanban,
-  History,
-  Home,
-  Menu,
-  Network,
-  PanelLeftClose,
-  PanelLeftOpen,
-  RefreshCw,
-  Route,
-  Search,
-  Settings,
-  ShieldCheck,
-  Sparkles,
-  Terminal,
-  X,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { ActivityLogIcon as Activity, ArchiveIcon as Archive, AvatarIcon as Bot, CubeIcon as Box, CheckCircledIcon as CheckCircle2, ChevronLeftIcon as ChevronLeft, RowsIcon as Command, BoxIcon as Container, ExternalLinkIcon as ExternalLink, CodeIcon as FileCode2, LayersIcon as FolderKanban, UpdateIcon as History, Component1Icon as Home, HamburgerMenuIcon as Menu, Share2Icon as Network, ViewVerticalIcon as PanelLeftClose, ViewVerticalIcon as PanelLeftOpen, ReloadIcon as RefreshCw, MagnifyingGlassIcon as Route, MagnifyingGlassIcon as Search, GearIcon as Settings, LockClosedIcon as ShieldCheck, StarIcon as Sparkles, CodeIcon as Terminal, Cross2Icon as X } from "@radix-ui/react-icons";
+import * as React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { api } from "@/lib/api";
@@ -45,9 +19,10 @@ import { ApprovalsView, AuditView } from "@/views/safety";
 import { SettingsView } from "@/views/settings";
 import { TopologyView } from "@/views/topology";
 import { CommandPalette } from "./command-palette";
+import { ThemeToggle } from "./theme-toggle";
 
 type ViewId = "overview" | "workspaces" | "topology" | "activity" | "containers" | "processes" | "ports" | "files" | "docker" | "projects" | "agent" | "approvals" | "history" | "admin" | "settings";
-interface NavItem { id: ViewId; label: string; icon: LucideIcon; count?: "projects" | "containers" | "ports" | "approvals" }
+interface NavItem { id: ViewId; label: string; icon: React.FC<any>; count?: "projects" | "containers" | "ports" | "approvals" }
 
 const groups: Array<{ label: string; items: NavItem[] }> = [
   { label: "Workspace", items: [{ id: "overview", label: "Overview", icon: Home }, { id: "workspaces", label: "Workspaces", icon: FolderKanban, count: "projects" }, { id: "topology", label: "Topology", icon: Network }] },
@@ -142,7 +117,7 @@ export function ControlPlane() {
         <footer><div className="daemon-state"><i className={healthy ? "online" : ""} /><span><strong>{healthy ? "Daemon online" : "Connecting"}</strong><small>127.0.0.1 · local only</small></span></div><a href="/docs" target="_blank"><ExternalLink /> <span>API reference</span></a></footer>
       </aside>
       <main className="main">
-        <header className="topbar"><button className="mobile-menu" onClick={() => setMobileOpen(true)}><Menu /></button><div className="breadcrumbs"><span>Arbiter</span><i>/</i><strong>{viewTitles[view]}</strong></div><div className="top-actions"><span className="sync-state">{lastSync ? `Updated ${lastSync.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Syncing…"}</span><span className="live-pill"><i /> Live</span><button className="command-button" onClick={() => setPaletteOpen(true)}><Search /><span>Search resources…</span><kbd>⌘ K</kbd></button><button className="icon-button" onClick={refresh} title="Refresh current view"><RefreshCw /></button><button className="button primary ask-button" onClick={() => navigate("agent")}><Sparkles /> Ask Arbiter</button></div></header>
+        <header className="topbar"><button className="mobile-menu" onClick={() => setMobileOpen(true)}><Menu /></button><div className="breadcrumbs"><span>Arbiter</span><i>/</i><strong>{viewTitles[view]}</strong></div><div className="top-actions"><ThemeToggle /><span className="sync-state">{lastSync ? `Updated ${lastSync.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Syncing…"}</span><span className="live-pill"><i /> Live</span><button className="command-button" onClick={() => setPaletteOpen(true)}><Search /><span>Search resources…</span><kbd>⌘ K</kbd></button><button className="icon-button" onClick={refresh} title="Refresh current view"><RefreshCw /></button><button className="button primary ask-button" onClick={() => navigate("agent")}><Sparkles /> Ask Arbiter</button></div></header>
         <div className="content" key={view}>{activeContent}</div>
       </main>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} onNavigate={navigate} />

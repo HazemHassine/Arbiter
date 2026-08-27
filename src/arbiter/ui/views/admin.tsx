@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Bot, Clock3, Database, ExternalLink, FileText, Gauge, Radio, RefreshCw, ShieldCheck, Terminal, Wrench } from "lucide-react";
+import { ActivityLogIcon as Activity, AvatarIcon as Bot, ClockIcon as Clock3, ArchiveIcon as Database, ExternalLinkIcon as ExternalLink, FileTextIcon as FileText, DashboardIcon as Gauge, RadiobuttonIcon as Radio, ReloadIcon as RefreshCw, LockClosedIcon as ShieldCheck, CodeIcon as Terminal, MixerHorizontalIcon as Wrench } from "@radix-ui/react-icons";
 import { useEffect, useState } from "react";
 
 import { Button, EmptyState, ErrorNotice, KeyValue, LoadingRows, MetricCard, PageHeader, Panel, PanelHeader, StatusBadge } from "@/components/ui";
@@ -37,7 +37,7 @@ function AdminObservability({ overview, requests, latency, llm, database }: { ov
   const samples = Array.isArray(requests.samples) ? requests.samples as JsonRecord[] : [];
   const routes = Array.isArray(requests.routes) ? requests.routes as JsonRecord[] : [];
   return <>
-    <div className="metric-grid admin-metrics"><MetricCard label="Process uptime" value={formatDuration(Number(telemetry.uptime_seconds))} note="Current daemon process" icon={Clock3} tone="green" /><MetricCard label="API requests" value={asText(requests.total)} note={`${asText(requests.requests_last_minute)} in the last minute`} icon={Activity} tone="blue" /><MetricCard label="p95 latency" value={`${asText(latency.p95)} ms`} note={`${Math.round(Number(requests.error_rate || 0) * 100)}% error rate`} icon={Gauge} tone="purple" /><MetricCard label="Model calls" value={asText(llm.calls)} note={`${asText(llm.total_tokens)} tokens`} icon={Bot} tone="amber" /><MetricCard label="Persisted rows" value={asText(database.total_rows)} note={formatBytes(database.size_bytes)} icon={Database} tone="blue" /></div>
+    <div className="metric-grid admin-metrics"><MetricCard label="Process uptime" value={formatDuration(Number(telemetry.uptime_seconds))} note="Current daemon process" icon={Clock3} tone="green" /><MetricCard label="API requests" value={asText(requests.total)} note={`${asText(requests.requests_last_minute)} in the last minute`} icon={Activity} tone="blue" /><MetricCard label="p95 latency" value={`${asText(latency.p95)} ms`} note={`${Math.round(Number(requests.error_rate || 0) * 100)}% error rate`} icon={Gauge} tone="amber" /><MetricCard label="Model calls" value={asText(llm.calls)} note={`${asText(llm.total_tokens)} tokens`} icon={Bot} tone="amber" /><MetricCard label="Persisted rows" value={asText(database.total_rows)} note={formatBytes(database.size_bytes)} icon={Database} tone="blue" /></div>
     <div className="admin-grid">
       <Panel className="span-2 chart-panel"><PanelHeader title="Request latency" description="Rolling process-local samples" action={<StatusBadge value={`${asText(requests.active)} active`} />} /><LatencyChart samples={samples} /></Panel>
       <Panel><PanelHeader title="Daemon process" description="Current runtime footprint" /><div className="key-value-stack"><KeyValue label="PID" value={asText(process.pid)} /><KeyValue label="Python" value={asText(process.python)} /><KeyValue label="Threads" value={asText(process.threads)} /><KeyValue label="RSS" value={formatBytes(process.rss_bytes)} /><KeyValue label="CPU time" value={`${asText(process.cpu_time_seconds)}s`} /></div></Panel>
@@ -54,7 +54,7 @@ function LatencyChart({ samples }: { samples: JsonRecord[] }) {
   const values = samples.map((sample) => Number(sample.duration_ms || 0));
   const max = Math.max(...values, 1);
   const points = values.map((value, index) => `${(index / Math.max(1, values.length - 1)) * 780 + 20},${210 - (value / max) * 170}`).join(" ");
-  return <div className="latency-chart"><svg viewBox="0 0 820 230" preserveAspectRatio="none"><line x1="20" y1="210" x2="800" y2="210" /><line x1="20" y1="40" x2="800" y2="40" /><polygon points={`20,210 ${points} 800,210`} fill="var(--blue-soft)" /><polyline points={points} /></svg><span>0 ms</span><span>{max.toFixed(0)} ms</span></div>;
+  return <div className="latency-chart"><svg viewBox="0 0 820 230" preserveAspectRatio="none"><defs><linearGradient id="latencyArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#6e8cff" stopOpacity=".28" /><stop offset="1" stopColor="#6e8cff" stopOpacity="0" /></linearGradient></defs><line x1="20" y1="210" x2="800" y2="210" /><line x1="20" y1="40" x2="800" y2="40" /><polygon points={`20,210 ${points} 800,210`} fill="url(#latencyArea)" /><polyline points={points} /></svg><span>0 ms</span><span>{max.toFixed(0)} ms</span></div>;
 }
 
 function Harness({ data }: { data: JsonRecord }) {

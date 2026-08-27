@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Database, HardDrive, Network, RefreshCw, Search, Trash2 } from "lucide-react";
+import { CubeIcon as Box, ArchiveIcon as Database, DiscIcon as HardDrive, Share2Icon as Network, ReloadIcon as RefreshCw, MagnifyingGlassIcon as Search, TrashIcon as Trash2 } from "@radix-ui/react-icons";
 import { useMemo, useState } from "react";
 
 import { Button, EmptyState, ErrorNotice, KeyValue, LoadingRows, PageHeader, Panel, SearchInput, StatusBadge } from "@/components/ui";

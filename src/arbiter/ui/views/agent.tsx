@@ -1,20 +1,6 @@
 "use client";
 
-import {
-  Bot,
-  BrainCircuit,
-  Check,
-  Circle,
-  ListTree,
-  LoaderCircle,
-  Send,
-  ShieldCheck,
-  Sparkles,
-  Square,
-  User,
-  Wrench,
-  XCircle,
-} from "lucide-react";
+import { AvatarIcon as Bot, LightningBoltIcon as BrainCircuit, CheckIcon as Check, ValueIcon as Circle, ListBulletIcon as ListTree, UpdateIcon as LoaderCircle, PaperPlaneIcon as Send, LockClosedIcon as ShieldCheck, StarIcon as Sparkles, SquareIcon as Square, PersonIcon as User, MixerHorizontalIcon as Wrench, CrossCircledIcon as XCircle } from "@radix-ui/react-icons";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -287,13 +273,13 @@ export function AgentView({ notify }: { notify: (message: string, tone?: string)
         <aside className="agent-rail">
           <Panel>
             <span className="rail-icon"><ShieldCheck /></span>
-            <h2>Approval protected</h2>
-            <p>Medium and higher-risk changes require your explicit decision. The agent cannot silently cross the safety gate.</p>
+            <h2>Safety Gate Disclaimer</h2>
+            <p>Changes may require explicit approval depending on organizational policies.</p>
           </Panel>
           <Panel>
             <span className="rail-icon trace"><ListTree /></span>
-            <h2>Transparent execution</h2>
-            <p>The live trace shows model phases, tool calls, arguments, and evidence. Private chain-of-thought is never exposed.</p>
+            <h2>Execution Trace</h2>
+            <p>Execution steps are logged for auditing purposes.</p>
           </Panel>
           <Panel><span className="eyebrow">Good prompts</span>{suggestions.map((suggestion) => <button key={suggestion} onClick={() => void ask(suggestion)}>{suggestion}</button>)}</Panel>
         </aside>

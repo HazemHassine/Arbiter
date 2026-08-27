@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, FolderKanban, Play, RefreshCw, ScanSearch, Square, Trash2 } from "lucide-react";
+import { ArrowRightIcon as ArrowRight, LayersIcon as FolderKanban, PlayIcon as Play, ReloadIcon as RefreshCw, MagnifyingGlassIcon as ScanSearch, SquareIcon as Square, TrashIcon as Trash2 } from "@radix-ui/react-icons";
 import { useMemo, useState } from "react";
 
 import { Button, EmptyState, ErrorNotice, LoadingRows, PageHeader, Panel, ResourceGlyph, SearchInput, StatusBadge } from "@/components/ui";

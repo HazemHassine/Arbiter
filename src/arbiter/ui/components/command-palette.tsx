@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Box, Folder, Search, Sparkles, X } from "lucide-react";
+import { ArrowRightIcon as ArrowRight, CubeIcon as Box, Link2Icon as Folder, MagnifyingGlassIcon as Search, StarIcon as Sparkles, Cross2Icon as X } from "@radix-ui/react-icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { api } from "@/lib/api";

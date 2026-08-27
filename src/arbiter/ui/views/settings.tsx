@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Check, Cpu, RefreshCw, Server, Settings2 } from "lucide-react";
+import { CubeIcon as Box, CheckIcon as Check, DesktopIcon as Cpu, ReloadIcon as RefreshCw, CubeIcon as Server, GearIcon as Settings2 } from "@radix-ui/react-icons";
 
 import { Button, EmptyState, ErrorNotice, KeyValue, LoadingRows, PageHeader, Panel, PanelHeader, StatusBadge } from "@/components/ui";
 import { useResource } from "@/hooks/use-resource";

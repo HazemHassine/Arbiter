@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Container as ContainerIcon, Cpu, ExternalLink, Play, RefreshCw, Search, Square, Terminal } from "lucide-react";
+import { CubeIcon as Box, BoxIcon as ContainerIcon, DesktopIcon as Cpu, ExternalLinkIcon as ExternalLink, PlayIcon as Play, ReloadIcon as RefreshCw, MagnifyingGlassIcon as Search, SquareIcon as Square, CodeIcon as Terminal } from "@radix-ui/react-icons";
 import { useMemo, useState } from "react";
 
 import { Button, EmptyState, ErrorNotice, LoadingRows, PageHeader, Panel, SearchInput, StatusBadge } from "@/components/ui";

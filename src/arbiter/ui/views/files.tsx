@@ -1,6 +1,6 @@
 "use client";
 
-import { FileCode2, RefreshCw, RotateCcw, Save, Search, ShieldCheck } from "lucide-react";
+import { CodeIcon as FileCode2, ReloadIcon as RefreshCw, ResetIcon as RotateCcw, CheckIcon as Save, MagnifyingGlassIcon as Search, LockClosedIcon as ShieldCheck } from "@radix-ui/react-icons";
 import { useEffect, useMemo, useState } from "react";
 
 import { Button, EmptyState, ErrorNotice, LoadingRows, PageHeader, Panel, StatusBadge } from "@/components/ui";

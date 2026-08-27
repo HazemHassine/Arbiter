@@ -1,6 +1,6 @@
 "use client";
 
-import { Brain, Focus, Maximize2, Network, RefreshCw, Search, ZoomIn, ZoomOut } from "lucide-react";
+import { LightningBoltIcon as Brain, Crosshair2Icon as Focus, SizeIcon as Maximize2, Share2Icon as Network, ReloadIcon as RefreshCw, MagnifyingGlassIcon as Search, ZoomInIcon as ZoomIn, ZoomOutIcon as ZoomOut } from "@radix-ui/react-icons";
 import { useMemo, useState } from "react";
 
 import { Button, EmptyState, ErrorNotice, KeyValue, LoadingRows, PageHeader, Panel, ResourceGlyph, SearchInput, StatusBadge } from "@/components/ui";

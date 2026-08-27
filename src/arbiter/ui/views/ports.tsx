@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink, Route, Search, WandSparkles } from "lucide-react";
+import { ExternalLinkIcon as ExternalLink, MagnifyingGlassIcon as Route, MagnifyingGlassIcon as Search, MagicWandIcon as WandSparkles } from "@radix-ui/react-icons";
 import { useMemo, useState } from "react";
 
 import { Button, EmptyState, ErrorNotice, LoadingRows, PageHeader, Panel, SearchInput, StatusBadge } from "@/components/ui";
