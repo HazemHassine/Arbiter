@@ -1,0 +1,58 @@
+---
+title: CLI Commands
+description: Command-line interface usage
+---
+
+# Command-line Interface
+
+The Local Development Environment Agent provides a `dev-agent` Typer CLI that exposes core services via structured JSON commands. It calls the same shared services used by the API and UI.
+
+## Common Commands
+
+```bash
+# Start the Local Development Environment Agent web server
+dev-agent serve
+
+# Ask the agent a natural-language question
+dev-agent ask "what is using port 5432?"
+
+# List all current port listeners
+dev-agent ports
+
+# Find available free ports
+dev-agent ports --free 3000:4000 --count 10
+
+# View registered projects
+dev-agent projects
+
+# Discover projects under configured PROJECT_ROOTS
+dev-agent projects --scan
+
+# Register a specific project
+dev-agent register /path/to/project
+
+# Inspect a registered project
+dev-agent inspect project-name
+
+# Prepare a project (detect conflicts, propose replacement ports, create approvals)
+dev-agent prepare project-name
+
+# List Docker containers
+dev-agent containers
+
+# View the last 200 log lines of a specific container
+dev-agent logs container-name --tail 200
+
+# View Docker disk usage statistics
+dev-agent disk
+
+# Approve an action by its specific ID
+dev-agent approve APPROVAL_ID
+
+# Start the MCP stdio adapter
+dev-agent mcp
+```
+
+## Output Format
+
+The CLI outputs structured JSON for machine-readable operations. This enables scripting and automation, while maintaining identical business logic as the API and browser control panel.

@@ -1,0 +1,99 @@
+---
+title: UI Features & Usage
+description: Control Panel usage and features
+---
+
+# Browser Control Panel
+
+The control panel is available at `http://127.0.0.1:8765`. FastAPI redirects `/` to `/ui/` and serves the bundled assets directly.
+
+## Visual Design
+
+The interface uses a dark operational-console aesthetic with cyan status accents, compact monospaced metadata, bordered cards, live badges, subtle grid textures, and restrained animation. It is designed to communicate system state rather than look like a generic chat application.
+
+The desktop layout uses a persistent left sidebar, sticky header, and responsive content grid. On small screens the sidebar becomes a slide-out menu, tables become horizontally scrollable, cards collapse to a single column, and action controls wrap for touch use.
+
+All dynamic values inserted into HTML are escaped. The UI has no direct access to Docker or the filesystem; every operation goes through the REST API.
+
+## Sidebar and Global Status
+
+The sidebar provides navigation to Overview, Ask Agent, Ports, Projects, Containers, Docker, Approvals, and Action History. Count badges show current port, project, container, and pending-approval totals.
+
+The footer reports whether the local agent is reachable and links to API documentation. The top bar shows the current section, last synchronization time, a refresh action, and a global Ask Agent button.
+
+## Screens Overview
+
+### Overview
+
+The overview is an operational dashboard containing:
+
+- listening-port count and unique host-port count;
+- registered-project count;
+- running and total container counts;
+- pending-approval count;
+- a live sample of port owners;
+- disk and memory usage gauges;
+- a compact registered-project list;
+- a quick project-preparation selector.
+
+The dashboard loads Linux, Docker, SQLite, and system-resource data concurrently. One unavailable subsystem does not prevent other cards from rendering.
+
+### Ask Agent
+
+This screen provides a conversation console with suggested prompts and an explicit safety notice. Submitted questions are sent to `/api/v1/agent/query`.
+
+The response displays the agent's concise message and structured observations. When an agent operation creates an approval, the UI alerts the user and updates the approval count. It does not automatically approve the action.
+
+### Ports
+
+The port view provides:
+
+- filtering by port, process, container, project, service, or source;
+- a conflict-status card;
+- configurable free-port range and count fields;
+- copyable free-port results;
+- a detailed ownership table containing host, protocol, owner, PID/container ID, project/service, source, and state.
+
+### Projects
+
+Projects can be registered by explicit path or discovered by scanning configured roots. Each project card shows service, port, and Compose-file counts.
+
+Project actions include:
+
+- inspect project metadata;
+- show diagnosis, redacted environment, and Make targets;
+- prepare and resolve conflicts;
+- start, stop, and restart through approvals;
+- unregister without deleting project files.
+
+### Containers
+
+The container table displays name, shortened ID, image, state, health, published ports, and Compose ownership. Users can view the last 200 log lines, inspect raw one-shot statistics, and propose start, stop, or restart actions.
+
+### Docker
+
+Tabbed Docker views provide:
+
+- disk usage summary;
+- images with tags, size, use status, and removal proposal;
+- volumes with driver, mountpoint, current users, and destructive removal proposal for unused volumes;
+- networks with driver, scope, member list, and detailed inspection.
+
+### Approvals
+
+The approvals page is the human safety gate. Each card shows risk, action summary, action name, expiration time, and current status.
+
+For pending approvals the user can:
+
+- reject the proposal; or
+- choose **Approve & execute**, confirm the decision, and execute the exact stored action.
+
+The result is displayed after execution. Failed or unverified actions open a detailed result dialog rather than being presented as successful.
+
+### Action History
+
+The audit screen lists action type, risk, status, verification status, action ID, and request ID. It supports all/completed/failed filtering and opens the full stored action record for inspection.
+
+## Dialogs and Notifications
+
+The UI uses modal dialogs for project inspection, logs, metrics, approval details, and operation results. Toast messages report successful refreshes, proposals, errors, and completed decisions without hiding detailed verification data.
