@@ -1,0 +1,44 @@
+---
+title: Introduction
+description: Local Developer Control Plane Documentation
+---
+
+# Local Developer Control Plane
+
+A local-first Linux control plane for understanding and safely operating projects, Docker/Compose resources, host processes, ports, files, and development servers. It follows an explicit observe → diagnose → propose → approve → act → verify workflow and binds its API to `127.0.0.1` by default.
+
+## Quick Start
+
+```bash
+cp .env.example .env
+uv sync --extra dev
+uv run dev-agent serve
+curl http://127.0.0.1:8765/health
+curl http://127.0.0.1:8765/api/v1/ports
+```
+
+Open [http://127.0.0.1:8765](http://127.0.0.1:8765) for the control panel. It uses a compact product-console interface with a global live-resource picker, an interactive topology canvas, workspace screens, process evidence, and an observability console for SSE events, auto-refreshing container logs and metrics, and embedded localhost previews.
+
+The Admin page adds rolling API latency, LLM usage, event pipeline, process/database, agent-harness, and safety-policy views alongside an operational handbook.
+
+Docker resources, command search, port tracing, and the approval-protected project file editor remain available in the same shell. The bundled UI is a statically exported Next.js application, so it needs no separate frontend runtime server. FastAPI serves the export directly, and the UI uses the same REST safety pipeline as the CLI.
+
+## What it observes
+
+- A fresh topology graph links projects, Compose files/services, containers, images, volumes, networks, ports, host processes, Dockerfiles, and Make targets.
+- The topology canvas supports zoom and fit controls, connected-path focus, project scoping, local search, and strict natural-language resource filtering.
+- Runtime-driven discovery creates ephemeral workspace evidence from Compose labels and process working directories; explicit registration remains required before a project can be edited.
+- Docker event streaming plus configurable host polling drive the SSE activity feed at `/api/v1/events/stream`.
+- The observability workspace can tail a selected container, filter or pause output, inspect a runtime metrics snapshot, and render likely HTTP listeners in an embedded preview with a new-tab fallback. Logs and metrics remain on demand and are never persisted by the control plane.
+- Dockerfile and Makefile inspection provide deterministic metadata and conservative diagnostics; the LLM layer only sits above typed read-only tools.
+- Optional resource-query interpretation uses `FILTER_LLM_MODEL` (default `gpt-5.4-nano`) to produce a strict typed filter plan. Matching is still local and deterministic, and automatically falls back to the built-in parser.
+
+## Register and prepare a project
+
+```bash
+uv run dev-agent register /home/user/dev/github-analysis
+uv run dev-agent prepare github-analysis
+uv run dev-agent approve APPROVAL_ID
+```
+
+The preparation operation inspects Compose configuration and real listening ports. Conflicting host ports produce deterministic alternatives and a persisted approval. Approval executes exactly the stored arguments, backs up configuration, validates it, recreates only affected services, and records post-action checks.
