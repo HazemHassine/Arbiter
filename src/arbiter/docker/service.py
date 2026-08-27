@@ -4,6 +4,7 @@ import docker
 from docker.errors import DockerException, NotFound
 
 from arbiter.models import ContainerInfo, PortBinding
+from arbiter.security import redact, redact_sensitive_arguments, redact_sensitive_text
 
 
 class DockerUnavailable(RuntimeError):
@@ -57,7 +58,9 @@ class DockerService:
         image = config.get("Image") or next(iter(attrs.get("RepoTags") or []), "<unknown>")
         command = config.get("Cmd") or []
         if isinstance(command, str):
-            command = [command]
+            command = [redact_sensitive_text(command) or ""]
+        else:
+            command = redact_sensitive_arguments([str(item) for item in command])
         return ContainerInfo(
             id=container.id,
             name=container.name,
@@ -70,12 +73,12 @@ class DockerService:
             exposed_ports=exposed,
             mounts=attrs.get("Mounts", []),
             networks=list((attrs.get("NetworkSettings", {}).get("Networks") or {}).keys()),
-            labels=labels,
+            labels=redact(labels),
             compose_project=labels.get("com.docker.compose.project"),
             compose_service=labels.get("com.docker.compose.service"),
             compose_working_dir=labels.get("com.docker.compose.project.working_dir"),
             created=attrs.get("Created"),
-            command=[str(item) for item in command],
+            command=command,
         )
 
     def list_containers(self, all: bool = True) -> list[ContainerInfo]:
@@ -149,7 +152,7 @@ class DockerService:
             "size": image.attrs.get("Size", 0),
             "created": image.attrs.get("Created"),
             "used": used,
-            "labels": (image.attrs.get("Config") or {}).get("Labels") or {},
+            "labels": redact((image.attrs.get("Config") or {}).get("Labels") or {}),
         }
 
     def remove_image(self, identifier: str) -> dict[str, Any]:
@@ -171,7 +174,7 @@ class DockerService:
                 "mountpoint": volume.attrs.get("Mountpoint"),
                 "size": (volume.attrs.get("UsageData") or {}).get("Size"),
                 "created": volume.attrs.get("CreatedAt"),
-                "labels": volume.attrs.get("Labels") or {},
+                "labels": redact(volume.attrs.get("Labels") or {}),
                 "users": [
                     {
                         "name": c.name,
@@ -221,7 +224,7 @@ class DockerService:
             "mountpoint": volume.attrs.get("Mountpoint"),
             "size": (volume.attrs.get("UsageData") or {}).get("Size"),
             "created": volume.attrs.get("CreatedAt"),
-            "labels": volume.attrs.get("Labels") or {},
+            "labels": redact(volume.attrs.get("Labels") or {}),
             "users": users,
         }
 
@@ -243,7 +246,7 @@ class DockerService:
                 "name": network.name,
                 "driver": network.attrs.get("Driver"),
                 "scope": network.attrs.get("Scope"),
-                "labels": network.attrs.get("Labels") or {},
+                "labels": redact(network.attrs.get("Labels") or {}),
                 "members": [
                     {
                         "id": item.get("Name") or identifier,
@@ -268,7 +271,7 @@ class DockerService:
             "name": network.name,
             "driver": network.attrs.get("Driver"),
             "scope": network.attrs.get("Scope"),
-            "labels": network.attrs.get("Labels") or {},
+            "labels": redact(network.attrs.get("Labels") or {}),
             "members": list((network.attrs.get("Containers") or {}).values()),
         }
 

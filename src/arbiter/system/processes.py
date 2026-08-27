@@ -1,8 +1,11 @@
 import os
 import re
-import subprocess
+
+# The wrapper below always uses shell=False and argument arrays.
+import subprocess  # nosec B404
 from pathlib import Path
 
+from arbiter.security import redact_sensitive_text
 from arbiter.system.models import ProcessInfo
 
 DEVELOPMENT_SIGNATURES: tuple[tuple[set[str], str, float], ...] = (
@@ -106,8 +109,9 @@ def inspect_process(pid: int, ports: list[int] | None = None) -> ProcessInfo:
     cwd = _read_link(proc / "cwd")
     if cwd:
         evidence.append(f"cwd={cwd}")
-    if command:
-        evidence.append(f"cmdline={command}")
+    safe_command = redact_sensitive_text(command)
+    if safe_command:
+        evidence.append(f"cmdline={safe_command}")
     try:
         uid = proc.stat().st_uid
     except (OSError, PermissionError):
@@ -116,7 +120,7 @@ def inspect_process(pid: int, ports: list[int] | None = None) -> ProcessInfo:
         pid=pid,
         ppid=ppid,
         process=name,
-        command=command,
+        command=safe_command,
         executable=_read_link(proc / "exe"),
         cwd=cwd,
         uid=uid,
@@ -163,7 +167,16 @@ def process_info(pid: int) -> dict[str, object]:
 
 
 def run(args: list[str], timeout: float = 15.0, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(args, cwd=cwd, text=True, capture_output=True, timeout=timeout, check=False)
+    # Callers supply argument arrays; shell expansion is explicitly disabled.
+    return subprocess.run(  # nosec B603
+        args,
+        cwd=cwd,
+        text=True,
+        capture_output=True,
+        timeout=timeout,
+        check=False,
+        shell=False,
+    )
 
 
 def command_exists(name: str) -> bool:

@@ -45,7 +45,7 @@ def build_services(settings: Settings, docker: DockerService | None = None, scan
         project_provider=projects.list_projects,
     )
     system = SystemService()
-    files = FileService(database, projects)
+    files = FileService(database, projects, settings)
     topology = TopologyService(projects, docker_service, ports, system)
     impact = ImpactService(topology)
     actions = ActionService(database, projects, ports, docker_service, settings, files=files, impact=impact)

@@ -514,6 +514,9 @@ The server binds to `127.0.0.1` by default and rejects non-loopback binding unle
 `ALLOW_REMOTE_ACCESS=true` explicitly acknowledges an external authentication
 boundary. Important boundaries include:
 
+- exact Host validation to resist DNS rebinding;
+- same-origin checks for browser-initiated state changes;
+- restrictive browser security headers and non-cacheable API responses;
 - no arbitrary shell API;
 - no generic filesystem read or write API;
 - bounded automatic project scanning;
@@ -525,6 +528,8 @@ boundary. Important boundaries include:
 - exact container lookup with ambiguity rejection;
 - secret-key redaction for names containing `PASSWORD`, `SECRET`, `TOKEN`,
   `API_KEY`, `PRIVATE_KEY`, or `CREDENTIAL`;
+- no rendered Compose configuration output in API responses;
+- owner-only SQLite state and backups stored outside project build contexts;
 - persisted approval for risky actions;
 - no automatic persistent-volume removal.
 
@@ -658,7 +663,9 @@ The `.env.example` file documents the supported settings:
 ```env
 ARBITER_HOST=127.0.0.1
 ARBITER_PORT=8765
+ARBITER_TRUSTED_HOSTS=localhost,127.0.0.1,::1
 ALLOW_REMOTE_ACCESS=false
+ARBITER_STATE_DIRECTORY=~/.local/state/arbiter
 DATABASE_URL=sqlite:///./arbiter.db
 PROJECT_ROOTS=/home/user/dev
 PROJECT_SCAN_DEPTH=4

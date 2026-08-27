@@ -77,6 +77,9 @@ Examples of verification include:
 
 The server binds to `127.0.0.1` by default. Important boundaries include:
 
+- exact Host validation to resist DNS rebinding;
+- same-origin checks for browser-initiated state changes;
+- restrictive browser security headers and non-cacheable API responses;
 - no arbitrary shell API;
 - no generic filesystem read or write API;
 - bounded automatic project scanning;
@@ -87,5 +90,15 @@ The server binds to `127.0.0.1` by default. Important boundaries include:
 - bounded Docker log retrieval;
 - exact container lookup with ambiguity rejection;
 - secret-key redaction for names containing `PASSWORD`, `SECRET`, `TOKEN`, `API_KEY`, `PRIVATE_KEY`, or `CREDENTIAL`;
+- no rendered Compose configuration output in API responses;
+- owner-only SQLite state and backups stored outside project build contexts;
 - persisted approval for risky actions;
 - no automatic persistent-volume removal.
+
+These browser controls protect the local service from hostile websites; they are
+not user authentication. Non-loopback exposure still requires an external TLS
+and authentication boundary, an exact `ARBITER_TRUSTED_HOSTS` entry, and a network
+policy appropriate to the workstation.
+
+See the [security audit](/docs/security) for findings, verification evidence, and
+the residual-risk register.

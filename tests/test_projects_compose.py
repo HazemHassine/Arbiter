@@ -79,7 +79,7 @@ def test_project_environment_redacts_secrets(service_factory, tmp_path):
 def test_structured_compose_edit_creates_backup(tmp_path):
     file = tmp_path / "compose.yaml"
     file.write_text("services:\n  db:\n    ports: ['5432:5432']\n")
-    result = ComposeEditor().change_service_host_port(file, "db", 5432, 5433, validate=False)
+    result = ComposeEditor(tmp_path / "state").change_service_host_port(file, "db", 5432, 5433, validate=False)
     assert Path(result["backup"]).is_file()
     assert yaml.safe_load(file.read_text())["services"]["db"]["ports"] == ["5433:5432"]
 
@@ -95,7 +95,7 @@ def test_compose_edit_rejects_environment_driven_port(tmp_path):
 def test_structured_env_edit(tmp_path):
     file = tmp_path / ".env"
     file.write_text("API_PORT=8000\nPASSWORD=secret\n")
-    result = change_env_port(file, "API_PORT", 8000, 8001)
+    result = change_env_port(file, "API_PORT", 8000, 8001, tmp_path / "state")
     assert Path(result["backup"]).exists()
     assert "API_PORT=8001" in file.read_text()
     assert "PASSWORD=secret" in file.read_text()

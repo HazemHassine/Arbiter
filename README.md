@@ -169,14 +169,35 @@ in SQLite by protocol, so concurrent preparation requests cannot approve the sam
 replacement. Validation or service-recreation failures restore configuration and
 attempt to recreate affected services from the restored source.
 
+The HTTP boundary validates exact Host values to resist DNS rebinding and
+rejects cross-origin browser mutations. API responses are non-cacheable and
+carry restrictive framing, MIME-sniffing, referrer, and permissions headers.
+Rendered `docker compose config` output is never returned because interpolation
+can place environment secrets in that output. SQLite state and operational
+backups use owner-only permissions; backups live outside registered projects in
+`ARBITER_STATE_DIRECTORY` so they cannot accidentally enter a Docker build
+context.
+
 ## Configuration
 
 See `.env.example`. `PROJECT_ROOTS` is a comma-separated list. Discovery examines
-each configured root and its immediate child directories only. The API host should
+each configured root only to the bounded `PROJECT_SCAN_DEPTH`. The API host should
 remain loopback unless the operator adds an external authentication boundary.
 Arbiter refuses a non-loopback bind by default; `ALLOW_REMOTE_ACCESS=true` is an
-explicit escape hatch, not a substitute for authentication. Legacy
+explicit escape hatch, not a substitute for authentication. `ARBITER_TRUSTED_HOSTS`
+is an exact, comma-separated allowlist with no wildcard support. When a reverse
+proxy is used, list the public hostname explicitly. Legacy
 `DEV_AGENT_HOST` and `DEV_AGENT_PORT` variables remain accepted during migration.
+
+`ARBITER_STATE_DIRECTORY` defaults to `$XDG_STATE_HOME/arbiter`, or
+`~/.local/state/arbiter` when `XDG_STATE_HOME` is unset. Configuration backups
+are stored there with owner-only permissions. Existing backups from versions
+before this hardening pass may remain in a project's `.arbiter/backups` folder;
+move or remove them after confirming they are no longer needed.
+
+See [SECURITY.md](SECURITY.md) for the supported threat model and vulnerability
+reporting guidance. The dated audit and residual-risk register are published in
+the [security audit](docs/content/docs/security.mdx).
 
 `OBSERVATION_INTERVAL_SECONDS` defaults to `3` and controls host process/port
 polling. Docker's event stream is used when it is available.

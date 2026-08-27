@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Callable
 
 from arbiter.config import Settings, get_settings
@@ -10,6 +11,8 @@ from arbiter.models import (
     Project,
 )
 from arbiter.ports.scanner import LinuxPortScanner
+
+logger = logging.getLogger(__name__)
 
 
 class PortService:
@@ -45,7 +48,7 @@ class PortService:
                             owners.append(enriched)
                             by_port[key] = enriched
             except Exception:
-                pass
+                logger.debug("Docker metadata enrichment failed", exc_info=True)
         return sorted(owners, key=lambda item: (item.port, item.protocol))
 
     def find_port_owner(self, port: int, protocol: str = "tcp") -> PortOwner | None:

@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
@@ -21,6 +22,11 @@ class Database:
         from arbiter.persistence import tables  # noqa: F401
 
         Base.metadata.create_all(self.engine)
+        database = self.engine.url.database
+        if self.engine.url.get_backend_name() == "sqlite" and database and database != ":memory:":
+            path = Path(database).expanduser()
+            if path.exists():
+                path.chmod(0o600)
 
     def session(self) -> Iterator[Session]:
         with self.sessions() as session:

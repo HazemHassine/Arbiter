@@ -50,6 +50,7 @@ class FakeDocker:
 def settings(tmp_path: Path) -> Settings:
     return Settings(
         database_url=f"sqlite:///{tmp_path / 'test.db'}",
+        arbiter_state_directory=tmp_path / ".arbiter-state",
         project_roots=[tmp_path],
         default_port_search_range_start=3000,
         default_port_search_range_end=9999,

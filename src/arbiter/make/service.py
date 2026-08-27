@@ -133,7 +133,7 @@ class MakeService:
 
     def run(self, project: Path, target: str) -> dict[str, object]:
         self.inspect(project, target)
-        result = run(["make", target], cwd=project, timeout=300)
+        result = run(["make", "--", target], cwd=project, timeout=300)
         return {
             "returncode": result.returncode,
             "stdout": result.stdout,

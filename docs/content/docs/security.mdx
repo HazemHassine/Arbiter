@@ -1,0 +1,80 @@
+---
+title: Security Audit
+description: August 2026 audit findings, fixes, verification, and residual risks
+---
+
+# Security Audit
+
+Audit date: **2026-08-27**  
+Audited version: **0.4.0 plus the `security/audit-hardening` branch**  
+Scope: Python API, CLI and domain services; Next.js control panel; Fumadocs site;
+SQLite persistence; Docker/Compose and subprocess boundaries; dependencies,
+tracked secrets, and operator documentation.
+
+## Outcome
+
+The audit found no known dependency vulnerabilities and no committed live
+credentials. It identified one high-impact browser boundary weakness, two medium
+data-exposure/at-rest weaknesses, and several low-severity defense-in-depth gaps.
+All actionable findings listed below are fixed on the audit branch and covered by
+regression tests.
+
+| Severity | Finding | Resolution |
+| --- | --- | --- |
+| High | The unauthenticated localhost API accepted arbitrary Host values and browser cross-origin mutations, creating DNS-rebinding and CSRF paths to sensitive inspection and approval endpoints. | Added an exact, wildcard-free Host allowlist; same-origin `Origin`/`Referer` validation; Fetch Metadata rejection for cross-site mutations; and tests for browser and non-browser clients. |
+| Medium | `docker compose config` validation returned rendered stdout, which can contain secrets interpolated from `.env`. | Validation now returns only a boolean and a generic error; rendered output is discarded and regression-tested. |
+| Medium | SQLite and backup files could inherit group/world-readable modes, and backups inside projects could enter Docker build contexts. | SQLite is forced to `0600`; backup directories/files use `0700`/`0600`; operational backups moved to `ARBITER_STATE_DIRECTORY` outside registered projects; legacy backup restore remains supported. |
+| Low | Make and Compose service operands were not explicitly separated from CLI options. | Added `--` option terminators after validating targets/services against project files. |
+| Low | Process command lines and Docker labels could expose common secret-bearing arguments/keys in inspection results. | Added targeted command-argument redaction and recursive label redaction. |
+| Low | Docker metadata enrichment swallowed provider failures silently. | Failures now emit debug diagnostics without breaking core port inspection. |
+
+## Automated verification
+
+- `pip-audit` against the fully pinned production export: **no known vulnerabilities**.
+- `npm audit` for both `src/arbiter/ui` and `docs`: **0 vulnerabilities**.
+- Bandit recursive scan of `src/arbiter`: **0 findings** after review of the fixed-array, `shell=False` subprocess wrapper.
+- `detect-secrets` over authored source, tests, docs, project metadata, and the example environment: **no live secrets**. Five keyword matches were manually confirmed as redaction documentation or explicit test fixtures.
+- Ruff, the full pytest suite, and production UI/docs builds are release gates for this branch.
+
+## Existing controls confirmed
+
+- non-loopback binding is denied unless explicitly acknowledged;
+- project discovery is depth-bounded and skips generated/dependency trees and symlinks;
+- file edits resolve beneath a registered project and support only recognized configuration filenames;
+- YAML parsing uses `safe_load`;
+- subprocess execution uses argument arrays, `shell=False`, and timeouts;
+- Docker mutations use the typed SDK, exact/ambiguity-checked resource lookup, and verification;
+- medium, high, and destructive actions require immutable, expiring approvals;
+- replacement ports are transactionally reserved by protocol;
+- failed configuration changes perform compensating restoration;
+- `.env` editor payloads are masked from approval and action-list APIs;
+- request and log sizes exposed by the API are bounded.
+
+## Residual risks
+
+1. **No built-in authentication.** Keep Arbiter on loopback. Remote use requires an external authenticated TLS proxy, exact trusted-host configuration, and network policy. Browser protections are not authentication.
+2. **Docker daemon authority.** Docker socket access is effectively privileged on typical Linux workstations. Only run Arbiter as a trusted local user and protect the API accordingly.
+3. **Approved project code execution.** A reviewed Make target or Compose workload can execute whatever the registered project defines. Approval confirms intent; it does not sandbox untrusted project code.
+4. **Intentional local visibility.** The operator can view process command lines, container logs, and recognized project configuration, including `.env` through the file editor. Heuristic redaction reduces accidental disclosure but cannot identify every possible secret format.
+5. **External LLM disclosure.** When configured, prompts and selected tool observations are sent to the chosen OpenAI-compatible provider. Avoid putting secrets in prompts and choose a provider whose data policy is acceptable.
+6. **Resource exhaustion.** Input fields and log tails are bounded, but this release has no per-client rate limiter. The loopback/external-proxy boundary remains responsible for connection and request-rate controls.
+7. **Legacy backups.** Older installations may retain `.arbiter/backups` below registered projects. Confirm they are no longer required, then move or remove them before building or sharing those projects.
+
+## Re-running the audit
+
+```bash
+uv sync --frozen --extra dev
+uv run ruff check .
+uv run pytest
+uvx bandit -r src/arbiter -q
+
+uv export --frozen --no-dev --no-hashes --format requirements-txt \
+  | uvx --from pip-audit pip-audit -r /dev/stdin --no-deps --disable-pip
+
+(cd src/arbiter/ui && npm audit)
+(cd docs && npm audit)
+```
+
+Run a tracked-file secret scanner as part of release preparation and manually
+review every match; tests and security documentation intentionally contain
+secret-related keywords and placeholder values.

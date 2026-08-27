@@ -20,7 +20,15 @@ from arbiter.intelligence import IntelligenceService
 from arbiter.make.service import MakeService
 from arbiter.models import ActionSpec, Risk
 from arbiter.persistence.tables import ActionRow
-from arbiter.security import redact, redact_action_arguments, validate_bind_host
+from arbiter.security import (
+    is_unspecified_host,
+    normalize_hostname,
+    redact,
+    redact_action_arguments,
+    validate_bind_host,
+    validate_browser_origin,
+    validate_request_host,
+)
 from arbiter.services import Services, build_services
 
 
@@ -99,8 +107,59 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
             try:
                 validate_bind_host(bound_host, configured.allow_remote_access)
             except ValueError as exc:
-                return JSONResponse(status_code=403, content={"error": "remote_access_disabled", "detail": str(exc)})
-        return await call_next(request)
+                return _secure_response(
+                    JSONResponse(status_code=403, content={"error": "remote_access_disabled", "detail": str(exc)}),
+                    request.url.path,
+                )
+
+        host_headers = request.headers.getlist("host")
+        if len(host_headers) != 1:
+            return _secure_response(
+                JSONResponse(
+                    status_code=400,
+                    content={"error": "invalid_host", "detail": "Exactly one HTTP Host header is required"},
+                ),
+                request.url.path,
+            )
+        trusted_hosts = set(configured.arbiter_trusted_hosts)
+        configured_host = normalize_hostname(configured.arbiter_host)
+        if not is_unspecified_host(configured_host):
+            trusted_hosts.add(configured_host)
+        if bound_host == "testserver":
+            trusted_hosts.add("testserver")
+        try:
+            validate_request_host(host_headers[0], trusted_hosts)
+        except ValueError as exc:
+            return _secure_response(
+                JSONResponse(status_code=400, content={"error": "invalid_host", "detail": str(exc)}),
+                request.url.path,
+            )
+
+        origin_headers = request.headers.getlist("origin")
+        if len(origin_headers) > 1:
+            return _secure_response(
+                JSONResponse(
+                    status_code=403,
+                    content={"error": "cross_origin_request", "detail": "Multiple Origin headers are not allowed"},
+                ),
+                request.url.path,
+            )
+        try:
+            validate_browser_origin(
+                method=request.method,
+                scheme=request.url.scheme,
+                host_header=host_headers[0],
+                origin=origin_headers[0] if origin_headers else None,
+                referer=request.headers.get("referer"),
+                sec_fetch_site=request.headers.get("sec-fetch-site"),
+            )
+        except ValueError as exc:
+            return _secure_response(
+                JSONResponse(status_code=403, content={"error": "cross_origin_request", "detail": str(exc)}),
+                request.url.path,
+            )
+        response = await call_next(request)
+        return _secure_response(response, request.url.path)
 
     @app.middleware("http")
     async def collect_request_metrics(request: Request, call_next):
@@ -640,6 +699,18 @@ def _public_approval(approval) -> dict[str, Any]:
     result = approval.model_dump(mode="json")
     result["arguments"] = redact_action_arguments(approval.action, approval.arguments)
     return result
+
+
+def _secure_response(response, path: str):
+    response.headers.setdefault("Content-Security-Policy", "frame-ancestors 'none'; base-uri 'self'; object-src 'none'")
+    response.headers.setdefault("Cross-Origin-Resource-Policy", "same-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    if path.startswith("/api/v1"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 app = create_app()

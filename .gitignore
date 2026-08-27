@@ -28,6 +28,8 @@ site/
 *.db-shm
 *.db-wal
 *.log
+.arbiter/
+.arbiter-state/
 *.bak
 *.bak.*
 *.tmp

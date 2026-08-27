@@ -34,7 +34,10 @@ class ActionService:
         self.settings = settings
         self.approvals = ApprovalService(database)
         self.compose = ComposeService()
-        self.editor = ComposeEditor()
+        self.configuration_backup_root = (
+            settings.arbiter_state_directory.expanduser() / "backups" / "configuration"
+        ).resolve(strict=False)
+        self.editor = ComposeEditor(self.configuration_backup_root)
         self.make = MakeService()
         self.files = files
         self.impact = impact
@@ -159,7 +162,11 @@ class ActionService:
                         raise ValueError("Approved Compose path does not match registered project")
                     if change.get("env_variable"):
                         edit = change_env_port(
-                            project.path / ".env", change["env_variable"], change["old_port"], change["new_port"]
+                            project.path / ".env",
+                            change["env_variable"],
+                            change["old_port"],
+                            change["new_port"],
+                            self.configuration_backup_root,
                         )
                         validation = self.compose.validate(compose_file)
                         if not validation["valid"]:

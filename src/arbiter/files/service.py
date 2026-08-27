@@ -25,9 +25,13 @@ MAX_FILE_BYTES = 1_000_000
 class FileService:
     """Bounded editor service for known files below a registered project root."""
 
-    def __init__(self, database, projects) -> None:
+    def __init__(self, database, projects, settings=None) -> None:
         self.database = database
         self.projects = projects
+        self.settings = settings or database.settings
+        self.backup_root = (self.settings.arbiter_state_directory.expanduser() / "backups" / "files").resolve(
+            strict=False
+        )
         self.dockerfiles = DockerfileService()
         self.make = MakeService()
 
@@ -116,7 +120,7 @@ class FileService:
         if current.sha256 != expected_sha256:
             raise ValueError("File changed since this edit was proposed; no write was performed")
         self._validate_content(path, content)
-        backup_path = self._create_backup(root, path, current.sha256)
+        backup_path = self._create_backup(project.id, root, path, current.sha256)
         try:
             self._atomic_write(path, content.encode(), path.stat().st_mode)
             validation = self._validate_written(path)
@@ -128,7 +132,7 @@ class FileService:
             id=str(uuid4()),
             project_id=project.id,
             relative_path=path.relative_to(root).as_posix(),
-            backup_path=backup_path.relative_to(root).as_posix(),
+            backup_path=str(backup_path),
             before_sha256=current.sha256,
             after_sha256=after_hash,
         )
@@ -159,7 +163,7 @@ class FileService:
                 raise LookupError("No managed change is available to undo for this file")
             if self._sha(path.read_bytes()) != row.after_sha256:
                 raise ValueError("File changed after the managed edit; refusing to overwrite your newer change")
-            backup_path = self._backup_path(root, row.backup_path)
+            backup_path = self._backup_path(project_id, root, row.backup_path)
             current_bytes = path.read_bytes()
             mode = path.stat().st_mode
             self._atomic_write(path, backup_path.read_bytes(), mode)
@@ -278,21 +282,27 @@ class FileService:
             if os.path.exists(temporary):
                 os.unlink(temporary)
 
-    @staticmethod
-    def _create_backup(root: Path, path: Path, before_sha: str) -> Path:
-        directory = root / ".arbiter" / "backups"
+    def _create_backup(self, project_id: str, root: Path, path: Path, before_sha: str) -> Path:
+        project_key = hashlib.sha256(project_id.encode()).hexdigest()[:16]
+        directory = self.backup_root / project_key
         directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+        directory.chmod(0o700)
         safe_name = path.relative_to(root).as_posix().replace("/", "__")
         stamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S%f")
         backup = directory / f"{stamp}-{before_sha[:12]}-{safe_name}"
         shutil.copy2(path, backup)
+        backup.chmod(0o600)
         return backup
 
-    @staticmethod
-    def _backup_path(root: Path, raw_path: str) -> Path:
-        candidate = (root / raw_path).resolve(strict=True)
-        allowed = (root / ".arbiter" / "backups").resolve(strict=True)
-        if not candidate.is_file() or not candidate.is_relative_to(allowed):
+    def _backup_path(self, project_id: str, root: Path, raw_path: str) -> Path:
+        stored = Path(raw_path)
+        candidate = stored.resolve(strict=True) if stored.is_absolute() else (root / stored).resolve(strict=True)
+        project_key = hashlib.sha256(project_id.encode()).hexdigest()[:16]
+        central = (self.backup_root / project_key).resolve(strict=False)
+        legacy = (root / ".arbiter" / "backups").resolve(strict=False)
+        if not candidate.is_file() or not (
+            candidate.is_relative_to(central) or candidate.is_relative_to(legacy)
+        ):
             raise ValueError("Managed backup path is invalid")
         return candidate
 

@@ -19,7 +19,9 @@ cp .env.example .env
 # Server bindings
 ARBITER_HOST=127.0.0.1
 ARBITER_PORT=8765
+ARBITER_TRUSTED_HOSTS=localhost,127.0.0.1,::1
 ALLOW_REMOTE_ACCESS=false
+ARBITER_STATE_DIRECTORY=~/.local/state/arbiter
 
 # Data persistence
 DATABASE_URL=sqlite:///./arbiter.db
@@ -59,5 +61,17 @@ Configure `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL` for open-ended tool cal
 ### API Host
 The API host (`ARBITER_HOST`) should remain loopback (`127.0.0.1`). Arbiter
 refuses a non-loopback bind unless `ALLOW_REMOTE_ACCESS=true`; that escape hatch
-is not a substitute for authentication or an external security boundary. Legacy
+is not a substitute for authentication or an external security boundary.
+`ARBITER_TRUSTED_HOSTS` is a comma-separated exact allowlist used to reject Host
+header attacks and DNS rebinding. Wildcards are intentionally rejected. Add the
+public hostname explicitly when Arbiter sits behind an authenticated reverse
+proxy. Legacy
 `DEV_AGENT_HOST` and `DEV_AGENT_PORT` aliases remain accepted during migration.
+
+### `ARBITER_STATE_DIRECTORY`
+
+Operational backups are stored outside registered projects under this directory,
+with owner-only directory and file permissions. The default is
+`$XDG_STATE_HOME/arbiter`, falling back to `~/.local/state/arbiter`. This prevents
+backup copies of `.env` and Compose files from entering a project Docker build
+context.
