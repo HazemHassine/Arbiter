@@ -54,7 +54,7 @@ function LatencyChart({ samples }: { samples: JsonRecord[] }) {
   const values = samples.map((sample) => Number(sample.duration_ms || 0));
   const max = Math.max(...values, 1);
   const points = values.map((value, index) => `${(index / Math.max(1, values.length - 1)) * 780 + 20},${210 - (value / max) * 170}`).join(" ");
-  return <div className="latency-chart"><svg viewBox="0 0 820 230" preserveAspectRatio="none"><defs><linearGradient id="latencyArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#6e8cff" stopOpacity=".28" /><stop offset="1" stopColor="#6e8cff" stopOpacity="0" /></linearGradient></defs><line x1="20" y1="210" x2="800" y2="210" /><line x1="20" y1="40" x2="800" y2="40" /><polygon points={`20,210 ${points} 800,210`} fill="url(#latencyArea)" /><polyline points={points} /></svg><span>0 ms</span><span>{max.toFixed(0)} ms</span></div>;
+  return <div className="latency-chart"><svg viewBox="0 0 820 230" preserveAspectRatio="none"><line x1="20" y1="210" x2="800" y2="210" /><line x1="20" y1="40" x2="800" y2="40" /><polygon points={`20,210 ${points} 800,210`} fill="var(--blue-soft)" /><polyline points={points} /></svg><span>0 ms</span><span>{max.toFixed(0)} ms</span></div>;
 }
 
 function Harness({ data }: { data: JsonRecord }) {

@@ -47,6 +47,7 @@ yarn-error.log*
 pnpm-debug.log*
 
 # The static `src/dev_agent/ui/out/` export is intentionally bundled and tracked.
+src/arbiter/ui/out/_next/
 
 # Editors and operating systems
 .idea/
