@@ -287,13 +287,13 @@ export function AgentView({ notify }: { notify: (message: string, tone?: string)
         <aside className="agent-rail">
           <Panel>
             <span className="rail-icon"><ShieldCheck /></span>
-            <h2>Approval protected</h2>
-            <p>Medium and higher-risk changes require your explicit decision. The agent cannot silently cross the safety gate.</p>
+            <h2>Safety Gate Disclaimer</h2>
+            <p>Changes may require explicit approval depending on organizational policies.</p>
           </Panel>
           <Panel>
             <span className="rail-icon trace"><ListTree /></span>
-            <h2>Transparent execution</h2>
-            <p>The live trace shows model phases, tool calls, arguments, and evidence. Private chain-of-thought is never exposed.</p>
+            <h2>Execution Trace</h2>
+            <p>Execution steps are logged for auditing purposes.</p>
           </Panel>
           <Panel><span className="eyebrow">Good prompts</span>{suggestions.map((suggestion) => <button key={suggestion} onClick={() => void ask(suggestion)}>{suggestion}</button>)}</Panel>
         </aside>
