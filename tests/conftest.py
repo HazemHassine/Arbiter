@@ -1,49 +1,22 @@
+import sys
 from pathlib import Path
 
-import pytest
+# Ensure project root is in sys.path
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
-from arbiter.config import Settings
-from arbiter.models import ContainerInfo
-from arbiter.services import build_services
+from typing import Any  # noqa: E402
 
+import pytest  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+from typer.testing import CliRunner  # noqa: E402
 
-class FakeScanner:
-    def __init__(self, owners=None):
-        self.owners = owners or []
-
-    def scan(self):
-        return [item.model_copy(deep=True) for item in self.owners]
-
-
-class FakeDocker:
-    def __init__(self, containers=None):
-        self.containers = containers or []
-        self.executed = []
-
-    def list_containers(self, all=True):
-        return list(self.containers)
-
-    def inspect_container(self, identifier):
-        matches = [item for item in self.containers if identifier in {item.id, item.name}]
-        if not matches:
-            raise LookupError(identifier)
-        return matches[0]
-
-    def container_action(self, identifier, action):
-        self.executed.append((identifier, action))
-        return {"identifier": identifier, "action": action, "verified": True}
-
-    def list_images(self):
-        return []
-
-    def list_volumes(self):
-        return []
-
-    def list_networks(self):
-        return []
-
-    def disk_usage(self):
-        return {"images": {"count": 0}}
+from arbiter.api.app import create_app  # noqa: E402
+from arbiter.config import Settings  # noqa: E402
+from arbiter.models import ContainerInfo  # noqa: E402
+from arbiter.services import build_services  # noqa: E402
+from tests.fixtures.doubles import FakeDocker, FakeScanner  # noqa: E402
 
 
 @pytest.fixture
@@ -53,17 +26,41 @@ def settings(tmp_path: Path) -> Settings:
         project_roots=[tmp_path],
         default_port_search_range_start=3000,
         default_port_search_range_end=9999,
+        _env_file=None,
     )
 
 
 @pytest.fixture
-def service_factory(settings):
-    def factory(owners=None, containers=None):
-        return build_services(settings, docker=FakeDocker(containers), scanner=FakeScanner(owners))
+def service_factory(settings: Settings):
+    def factory(owners=None, containers=None, **kwargs: Any):
+        docker = kwargs.pop("docker", FakeDocker(containers))
+        scanner = kwargs.pop("scanner", FakeScanner(owners))
+        return build_services(settings, docker=docker, scanner=scanner, **kwargs)
 
     return factory
 
 
 @pytest.fixture
-def container():
-    return ContainerInfo(id="abc123", name="db", image="postgres:16", state="running")
+def container() -> ContainerInfo:
+    return ContainerInfo(
+        id="abc123456789",
+        name="test-postgres",
+        image="postgres:16",
+        state="running",
+        compose_project="test-project",
+        compose_service="db",
+    )
+
+
+@pytest.fixture
+def cli_runner() -> CliRunner:
+    return CliRunner()
+
+
+@pytest.fixture
+def test_client_factory(service_factory):
+    def factory(owners=None, containers=None, **kwargs: Any) -> TestClient:
+        services = service_factory(owners=owners, containers=containers, **kwargs)
+        return TestClient(create_app(services=services))
+
+    return factory

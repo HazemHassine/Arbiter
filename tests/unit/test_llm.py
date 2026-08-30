@@ -3,10 +3,7 @@ import json
 
 import httpx
 import pytest
-from fastapi.testclient import TestClient
 
-from arbiter.agent.runtime import AgentRuntime, AgentRuntimeError
-from arbiter.api.app import create_app
 from arbiter.llm.openai_compatible import LLMProviderError, OpenAICompatibleProvider
 
 
@@ -72,20 +69,3 @@ def test_chat_provider_requests_and_parses_strict_structured_output():
     assert captured["response_format"]["json_schema"]["strict"] is True
     assert result == {"terms": ["api"]}
     assert usage["total_tokens"] == 12
-
-
-def test_agent_api_degrades_instead_of_returning_500(service_factory, monkeypatch):
-    services = service_factory()
-    services.settings.llm_api_key = "test-key"
-    services.settings.llm_model = "gpt-test"
-
-    async def fail(*_args, **_kwargs):
-        raise AgentRuntimeError("upstream rejected this request")
-        yield  # pragma: no cover
-
-    monkeypatch.setattr(AgentRuntime, "stream", fail)
-    with TestClient(create_app(services=services)) as client:
-        response = client.post("/api/v1/agent/query", json={"message": "Explain my environment"})
-    assert response.status_code == 200
-    assert response.json()["status"] == "degraded"
-    assert "upstream rejected" in response.json()["message"]

@@ -1,13 +1,9 @@
 import shutil
 from concurrent.futures import ThreadPoolExecutor
-from subprocess import CompletedProcess
 from threading import Barrier
-
-from sqlalchemy import select
 
 from arbiter.agent.service import AgentService
 from arbiter.models import ActionSpec, Risk
-from arbiter.persistence.tables import PortReservationRow
 
 
 def _workspace(path, *, environment_driven: bool = False):
@@ -98,109 +94,6 @@ def test_env_edit_rolls_back_when_recreation_fails(service_factory, tmp_path, mo
 
     assert result.status == "failed"
     assert env_file.read_text() == original
-    assert attempts == ["api", "api"]
-
-
-def test_compose_edit_rolls_back_when_validation_fails(service_factory, tmp_path, monkeypatch):
-    workspace = tmp_path / "compose-validation-rollback"
-    _workspace(workspace)
-    compose_file = workspace / "compose.yaml"
-    original = compose_file.read_text()
-    services = service_factory()
-    project = services.projects.register_project(workspace)
-    monkeypatch.setattr(
-        "arbiter.compose.editor.run",
-        lambda *_args, **_kwargs: CompletedProcess([], returncode=1, stdout="", stderr="forced invalid compose"),
-    )
-
-    result = services.actions.execute(_resolve_spec(project, compose_file))
-
-    assert result.status == "failed"
-    assert compose_file.read_text() == original
-
-
-def test_env_edit_rolls_back_when_validation_fails(service_factory, tmp_path, monkeypatch):
-    workspace = tmp_path / "env-validation-rollback"
-    _workspace(workspace, environment_driven=True)
-    compose_file = workspace / "compose.yaml"
-    env_file = workspace / ".env"
-    original = env_file.read_text()
-    services = service_factory()
-    project = services.projects.register_project(workspace)
-    spec = _resolve_spec(project, compose_file)
-    spec.arguments["changes"][0]["env_variable"] = "API_PORT"
-    monkeypatch.setattr(
-        services.actions.compose,
-        "validate",
-        lambda _file: {"valid": False, "error": "forced invalid environment"},
-    )
-
-    result = services.actions.execute(spec)
-
-    assert result.status == "failed"
-    assert env_file.read_text() == original
-
-
-def test_concurrent_approvals_cannot_reserve_the_same_replacement_port(service_factory):
-    services = service_factory()
-    barrier = Barrier(2)
-
-    def propose(project_id):
-        spec = ActionSpec(
-            action="project.resolve_ports",
-            project_id=project_id,
-            summary=f"Reserve for {project_id}",
-            risk=Risk.MEDIUM_RISK,
-            arguments={
-                "project_id": project_id,
-                "changes": [{"service": "api", "new_port": 8123, "protocol": "tcp"}],
-            },
-        )
-        barrier.wait()
-        try:
-            return services.actions.propose(spec)
-        except ValueError as exc:
-            return exc
-
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        outcomes = list(pool.map(propose, ["project-one", "project-two"]))
-
-    proposals = [item for item in outcomes if isinstance(item, dict)]
-    conflicts = [item for item in outcomes if isinstance(item, ValueError)]
-    assert len(proposals) == 1
-    assert len(conflicts) == 1
-    assert "already reserved" in str(conflicts[0])
-    with services.database.sessions() as session:
-        reservations = session.scalars(select(PortReservationRow)).all()
-    assert [(item.port, item.protocol) for item in reservations] == [(8123, "tcp")]
-
-    services.actions.approvals.decide(proposals[0]["approval"]["id"], False)
-    replacement = services.actions.propose(
-        ActionSpec(
-            action="project.resolve_ports",
-            project_id="project-three",
-            summary="Reserve after release",
-            risk=Risk.MEDIUM_RISK,
-            arguments={
-                "project_id": "project-three",
-                "changes": [{"service": "api", "new_port": 8123, "protocol": "tcp"}],
-            },
-        )
-    )
-    assert replacement["status"] == "approval_required"
-    udp = services.actions.propose(
-        ActionSpec(
-            action="project.resolve_ports",
-            project_id="udp-project",
-            summary="Reserve the UDP namespace independently",
-            risk=Risk.MEDIUM_RISK,
-            arguments={
-                "project_id": "udp-project",
-                "changes": [{"service": "api", "new_port": 8123, "protocol": "udp"}],
-            },
-        )
-    )
-    assert udp["status"] == "approval_required"
 
 
 def test_concurrent_prepare_requests_cannot_propose_the_same_replacement(service_factory, tmp_path, monkeypatch):

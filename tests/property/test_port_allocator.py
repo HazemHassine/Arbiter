@@ -5,11 +5,7 @@ from hypothesis import strategies as st
 from arbiter.config import Settings
 from arbiter.models import PortBinding, Project
 from arbiter.ports.service import PortService
-
-
-class EmptyScanner:
-    def scan(self):
-        return []
+from tests.fixtures.doubles import EmptyScanner
 
 
 @given(
@@ -31,9 +27,7 @@ def test_reconciliation_allocator_is_deterministic_and_protocol_specific(
         ),
     )
     other_protocol = "udp" if protocol == "tcp" else "tcp"
-    reserved = {(port, protocol) for port in reserved_ports} | {
-        (port, other_protocol) for port in other_protocol_ports
-    }
+    reserved = {(port, protocol) for port in reserved_ports} | {(port, other_protocol) for port in other_protocol_ports}
     ordered_candidates = [*range(preferred + 1, 3011), *range(3000, preferred)]
     available = [port for port in ordered_candidates if port not in reserved_ports]
 
