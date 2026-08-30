@@ -1,13 +1,101 @@
 ---
-title: CLI Commands
-description: Command-line interface usage
+title: CLI Commands & Terminal-First Ergonomics
+description: Command-line interface, interactive TUI mode, fuzzy selectors, and shell prompt integration
 ---
 
 # Command-line Interface
 
-Arbiter provides an `arbiter` Typer CLI that exposes core services via structured JSON commands. It calls the same shared services used by the API and UI.
+Arbiter provides a fast, developer-first command-line tool `arbiter` with interactive fuzzy pickers, a keyboard-driven Terminal UI (like lazydocker / k9s), shell prompt hooks, and structured JSON outputs for automation.
 
-## Common Commands
+---
+
+## Interactive Terminal UI (`arbiter tui`)
+
+Launch a full-screen, keyboard-driven Terminal UI dashboard without opening a browser:
+
+```bash
+arbiter tui
+```
+
+### Key Features & Vim Keybindings
+- **Tabbed Views**: `[1] Ports`, `[2] Containers`, `[3] Approvals`, `[4] Projects`, `[5] Logs`.
+- **Navigation**:
+  - `j` / `k` (or `Down` / `Up`): Navigate list items.
+  - `1`..`5` or `Tab`: Switch active tab.
+  - `g` / `G`: Jump to start / end of list.
+  - `Enter`: Inspect item details / drill down.
+  - `a`: Quickly approve and execute selected pending action.
+  - `l`: Jump straight to container live log stream.
+  - `p`: Propose project preparation with agent.
+  - `r`: Force data reload.
+  - `/`: Live fuzzy search within current view.
+  - `?`: Toggle help overlay.
+  - `q`: Quit.
+
+---
+
+## Interactive CLI Pickers (Fuzzy Search)
+
+When running commands without explicit target arguments in an interactive terminal, Arbiter automatically opens an fzf-style fuzzy search picker with a live preview pane:
+
+```bash
+# Interactively search and inspect registered projects
+arbiter inspect
+
+# Interactively search and prepare a project
+arbiter prepare
+
+# Interactively pick a running container to view logs
+arbiter logs
+
+# Interactively pick and execute a pending safety approval
+arbiter approve
+```
+
+---
+
+## Shell Prompt & Starship Integration (`arbiter prompt`)
+
+Display real-time environment status pills directly inside your terminal prompt (e.g. `⚡ Arbiter: 1 pending approval | 0 conflicts`):
+
+### Output Formats
+```bash
+# ANSI colored pill (default)
+arbiter prompt
+
+# Starship prompt format
+arbiter prompt --format starship
+
+# Plain text without color codes
+arbiter prompt --format plain
+
+# Compact badge format
+arbiter prompt --format short
+
+# Structured JSON for scripts / statusbars
+arbiter prompt --format json
+```
+
+### Shell Integration Setup
+Generate one-line integration hooks for your shell configuration:
+
+```bash
+# Starship prompt (~/.config/starship.toml)
+arbiter prompt init starship
+
+# Zsh (~/.zshrc)
+arbiter prompt init zsh
+
+# Bash (~/.bashrc)
+arbiter prompt init bash
+
+# Fish (~/.config/fish/config.fish)
+arbiter prompt init fish
+```
+
+---
+
+## Common Non-Interactive Commands
 
 ```bash
 # Start the Arbiter web server
@@ -31,10 +119,10 @@ arbiter projects --scan
 # Register a specific project
 arbiter register /path/to/project
 
-# Inspect a registered project
+# Inspect a specific registered project
 arbiter inspect project-name
 
-# Prepare a project (detect conflicts, propose replacement ports, create approvals)
+# Prepare a specific project (detect conflicts, propose replacement ports, create approvals)
 arbiter prepare project-name
 
 # List Docker containers
@@ -61,7 +149,3 @@ arbiter approve APPROVAL_ID
 # Start the MCP stdio adapter
 arbiter mcp
 ```
-
-## Output Format
-
-The CLI outputs structured JSON for machine-readable operations. This enables scripting and automation, while maintaining identical business logic as the API and browser control panel.

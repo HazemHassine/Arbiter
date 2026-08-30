@@ -33,6 +33,50 @@ same shell. The bundled UI is a statically exported Next.js application, so it
 needs no separate frontend runtime server. FastAPI serves the export directly,
 and the UI uses the same REST safety pipeline as the CLI.
 
+---
+
+## Terminal-First & Shell Ergonomics
+
+For engineers who prefer working entirely in the terminal without opening a browser:
+
+### 1. Interactive Terminal UI (`arbiter tui`)
+A fast, keyboard-driven Terminal UI (like lazydocker / k9s) letting you navigate ports, containers, approvals, projects, and container logs with vim keybindings:
+
+```bash
+arbiter tui
+```
+- **Tabs**: `[1] Ports`, `[2] Containers`, `[3] Approvals`, `[4] Projects`, `[5] Logs` (Switch with `1..5` or `Tab`)
+- **Keybindings**: `j`/`k` (navigate), `Enter` (inspect / drill down), `a` (approve action), `l` (jump to logs), `p` (prepare project), `r` (refresh), `/` (search), `?` (help), `q` (quit).
+
+### 2. Interactive CLI Pickers with Fuzzy Search
+Commands run without explicit target arguments open an interactive fuzzy selector (fzf-style) with a live details preview pane:
+
+```bash
+arbiter inspect   # Fuzzy select over registered projects
+arbiter prepare   # Fuzzy select project to prepare
+arbiter logs      # Fuzzy select container to stream logs
+arbiter approve   # Fuzzy select pending safety approval to execute
+```
+
+### 3. Shell Prompt & Starship Integration (`arbiter prompt`)
+Display real-time status pills in your `zsh`/`bash`/`fish` prompt or Starship:
+
+```bash
+# Formatted status pill (⚡ Arbiter: 1 pending approval | 0 conflicts)
+arbiter prompt
+
+# Starship prompt format
+arbiter prompt --format starship
+
+# Generate one-line shell hook configuration
+arbiter prompt init starship   # Starship TOML configuration
+arbiter prompt init zsh        # Zsh precmd hook
+arbiter prompt init bash       # Bash PROMPT_COMMAND hook
+arbiter prompt init fish       # Fish prompt hook
+```
+
+---
+
 ## What it observes
 
 - A fresh topology graph links projects, Compose files/services, containers,
@@ -191,17 +235,21 @@ than taking down the API.
 ## CLI
 
 ```bash
+arbiter tui                     # Launch full interactive TUI mode
+arbiter inspect                 # Fuzzy picker for project inspection
+arbiter prepare                 # Fuzzy picker for project preparation
+arbiter logs                    # Fuzzy picker for container logs
+arbiter approve                 # Fuzzy picker for pending approvals
+arbiter prompt                  # Output prompt status pill
+arbiter prompt init starship    # Generate Starship integration configuration
 arbiter ports
 arbiter ports --free 3000:4000 --count 10
 arbiter projects --scan
-arbiter inspect github-analysis
 arbiter ask 'Which projects have conflicting ports?'
 arbiter containers
 arbiter topology
-arbiter topology github-analysis
 arbiter processes
 arbiter runtimes
-arbiter logs postgres --tail 100
 arbiter disk
 ```
 

@@ -12,9 +12,9 @@ It deliberately avoids unrestricted shell access, arbitrary file editing, and un
 ## Architecture Diagram
 
 ```text
-Browser UI       CLI       REST clients       MCP clients       A2A clients
-    │             │             │                  │                 │
-    └─────────────┴─────────────┴──────────────────┴─────────────────┘
+Browser UI       TUI / CLI       REST clients       MCP clients       A2A clients
+    │                │                │                  │                 │
+    └────────────────┴────────────────┴──────────────────┴─────────────────┘
                                   │
                          Interface adapters
                                   │
@@ -29,13 +29,13 @@ Browser UI       CLI       REST clients       MCP clients       A2A clients
              Linux /proc + ss    Docker SDK    SQLite    project files
 ```
 
-Business logic does not live in the UI, CLI, or API routes. Those layers translate requests into calls to shared services. This prevents one interface from bypassing the safety rules or implementing behavior differently from another interface.
+Business logic does not live in the UI, TUI, CLI, or API routes. Those layers translate requests into calls to shared domain services. This prevents one interface from bypassing safety rules or implementing behavior differently from another interface.
 
 The application is a single Python process. It does not require Redis, Celery, Kafka, Kubernetes, or another background infrastructure service.
 
 ## Core Domains
 
-- `ports`: parses Linux `ss`, resolves processes through `/proc`, correlates Docker/Compose metadata, finds predictable free ports, and detects duplicate project claims.
+- `ports`: parses Linux `ss`, resolves processes through `/proc`, correlates Docker/Compose metadata, finds predictable free ports, and detects duplicate project claims and runtime port collisions.
 - `projects`: bounded discovery below configured roots and a refreshable SQLite registry. No whole-filesystem scan occurs.
 - `topology`, `system`, and `events`: generate a live, typed machine graph from Compose/Docker metadata, `/proc`, `ss`, and Docker events; runtime state is not persisted as authoritative data.
 - `docker` and `compose`: typed Docker SDK inspection, Compose label awareness, lifecycle operations, validation, and structured port editing.
@@ -43,7 +43,7 @@ The application is a single Python process. It does not require Redis, Celery, K
 - `config_intelligence`: cross-file port drift detection (`.env` vs `compose.yaml` vs `.env.example`), credential-safe missing env variable auditing, and visual diff dry-run time-travel state forecasting.
 - `safety`, `actions`, and `persistence`: immutable persisted approvals, one typed action dispatcher, history, and mandatory verification outcomes.
 - `agent`: deterministic intents plus LangChain v1's `create_agent` runtime, backed by LangGraph and restricted to the control plane's typed tools.
-- `api`, `cli`, and `integrations`: thin adapters over the same services.
+- `api`, `cli`, `tui`, and `integrations`: thin adapters over the same services.
 
 ## Safety Model
 

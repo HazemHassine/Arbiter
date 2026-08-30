@@ -17,11 +17,23 @@ curl http://127.0.0.1:8765/health
 curl http://127.0.0.1:8765/api/v1/ports
 ```
 
-Open [http://127.0.0.1:8765](http://127.0.0.1:8765) for the control panel. It uses a compact product-console interface with a global live-resource picker, an interactive topology canvas, workspace screens, process evidence, and an observability console for SSE events, auto-refreshing container logs and metrics, and embedded localhost previews.
+Open [http://127.0.0.1:8765](http://127.0.0.1:8765) for the web control panel. It uses a compact product-console interface with a global live-resource picker, an interactive topology canvas, workspace screens, process evidence, and an observability console for SSE events, auto-refreshing container logs and metrics, and embedded localhost previews.
 
 The Admin page adds rolling API latency, LLM usage, event pipeline, process/database, agent-harness, and safety-policy views alongside an operational handbook.
 
-Docker resources, command search, port tracing, and the approval-protected project file editor remain available in the same shell. The bundled UI is a statically exported Next.js application, so it needs no separate frontend runtime server. FastAPI serves the export directly, and the UI uses the same REST safety pipeline as the CLI.
+---
+
+## Terminal-First & Shell Ergonomics
+
+For engineers who want to stay in the terminal without opening a browser:
+
+- **Interactive TUI Mode (`arbiter tui`)**: A fast, keyboard-driven Terminal UI (like lazydocker / k9s) letting you navigate ports, containers, approvals, projects, and logs with vim keybindings (`j`/`k`/`Enter`/`Tab`/`1..5`/`a`/`l`).
+- **Interactive CLI Pickers with Fuzzy Search**: Commands like `arbiter prepare`, `arbiter inspect`, `arbiter logs`, or `arbiter approve` without arguments open an interactive fuzzy selector (`fzf`-style) over registered projects, active ports, containers, and approvals with a live preview pane.
+- **Shell Prompt / Starship Integration**: `arbiter prompt` hook to display status pills in your `zsh`/`bash`/`fish` prompt or Starship prompt (e.g., `⚡ Arbiter: 1 pending approval | 0 conflicts`).
+
+For full details, see the [CLI & Terminal Ergonomics Documentation](/docs/cli).
+
+---
 
 ## What it observes
 
