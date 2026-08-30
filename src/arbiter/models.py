@@ -141,3 +141,83 @@ class ActionResult(BaseModel):
     result: dict[str, Any] = Field(default_factory=dict)
     verification: dict[str, Any] = Field(default_factory=dict)
     error: str | None = None
+
+
+class ReadinessProbeType(StrEnum):
+    TCP_PORT = "tcp_port"
+    HTTP_GET = "http_get"
+    DOCKER_HEALTH = "docker_health"
+
+
+class ReadinessGate(BaseModel):
+    probe_type: ReadinessProbeType = ReadinessProbeType.TCP_PORT
+    host: str = "127.0.0.1"
+    port: int | None = None
+    path: str | None = None
+    timeout_seconds: float = 10.0
+    retry_interval_seconds: float = 0.5
+    expected_status: int = 200
+    service: str | None = None
+
+
+class ReadinessProbeResult(BaseModel):
+    service: str | None = None
+    probe_type: ReadinessProbeType
+    target: str
+    healthy: bool
+    latency_ms: float = 0.0
+    status_code: int | None = None
+    message: str | None = None
+    checked_at: datetime = Field(default_factory=utcnow)
+
+
+class StackProjectMember(BaseModel):
+    project_id: str
+    project_name: str
+    env_overrides: dict[str, str] = Field(default_factory=dict)
+    depends_on: list[str] = Field(default_factory=list)
+    readiness_gates: list[ReadinessGate] = Field(default_factory=list)
+    boot_stage: int = 0
+
+
+class Stack(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid4()))
+    name: str
+    description: str | None = None
+    projects: list[StackProjectMember] = Field(default_factory=list)
+    is_active: bool = False
+    status: str = "inactive"
+    tags: list[str] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)
+
+
+class BootOrderStage(BaseModel):
+    stage: int
+    projects: list[str]
+    readiness_gates: list[ReadinessGate] = Field(default_factory=list)
+    description: str | None = None
+
+
+class StackBootPlan(BaseModel):
+    stack_id: str
+    stack_name: str
+    stages: list[BootOrderStage] = Field(default_factory=list)
+    total_stages: int = 0
+    dependencies_valid: bool = True
+    cycle_detected: bool = False
+    error: str | None = None
+
+
+class StackSwitchResult(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid4()))
+    previous_stack_id: str | None = None
+    target_stack_id: str
+    stopped_projects: list[str] = Field(default_factory=list)
+    started_projects: list[str] = Field(default_factory=list)
+    port_reconciliations: list[PortReconciliationChange] = Field(default_factory=list)
+    env_changes: list[dict[str, Any]] = Field(default_factory=list)
+    readiness_results: list[ReadinessProbeResult] = Field(default_factory=list)
+    status: str = "completed"
+    verified: bool = True
+    error: str | None = None

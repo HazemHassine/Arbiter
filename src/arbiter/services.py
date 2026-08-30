@@ -11,6 +11,7 @@ from arbiter.persistence.database import Database
 from arbiter.ports.service import PortService
 from arbiter.projects.service import ProjectService
 from arbiter.runtimes.service import RuntimeService
+from arbiter.stacks.service import StackService
 from arbiter.system.service import SystemService
 from arbiter.telemetry import TelemetryRegistry
 from arbiter.topology.service import TopologyService
@@ -31,6 +32,7 @@ class Services:
     runtimes: RuntimeService
     events: EventBus
     telemetry: TelemetryRegistry
+    stacks: StackService
     config_intelligence: ConfigIntelligenceService | None = None
     observer: ObservationService | None = None
 
@@ -50,7 +52,10 @@ def build_services(settings: Settings, docker: DockerService | None = None, scan
     files = FileService(database, projects)
     topology = TopologyService(projects, docker_service, ports, system)
     impact = ImpactService(topology)
-    actions = ActionService(database, projects, ports, docker_service, settings, files=files, impact=impact)
+    stacks = StackService(database, projects, ports, docker_service, files=files, settings=settings)
+    actions = ActionService(
+        database, projects, ports, docker_service, settings, files=files, impact=impact, stacks=stacks
+    )
     services = Services(
         settings,
         database,
@@ -65,6 +70,7 @@ def build_services(settings: Settings, docker: DockerService | None = None, scan
         RuntimeService(docker_service),
         EventBus(),
         TelemetryRegistry(),
+        stacks,
     )
     services.config_intelligence = ConfigIntelligenceService(services)
     impact.config_intelligence = services.config_intelligence

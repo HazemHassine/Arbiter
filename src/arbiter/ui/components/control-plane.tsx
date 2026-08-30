@@ -17,19 +17,21 @@ import { ProjectsView } from "@/views/projects";
 import { ContainersView, ProcessesView } from "@/views/runtime";
 import { ApprovalsView, AuditView } from "@/views/safety";
 import { SettingsView } from "@/views/settings";
+import { StacksView } from "@/views/stacks";
 import { TopologyView } from "@/views/topology";
 import { CommandPalette } from "./command-palette";
 import { ThemeToggle } from "./theme-toggle";
 
-type ViewId = "overview" | "workspaces" | "topology" | "activity" | "containers" | "processes" | "ports" | "files" | "docker" | "projects" | "agent" | "approvals" | "history" | "admin" | "settings";
-interface NavItem { id: ViewId; label: string; icon: React.FC<any>; count?: "projects" | "containers" | "ports" | "approvals" }
+type ViewId = "overview" | "stacks" | "workspaces" | "topology" | "activity" | "containers" | "processes" | "ports" | "files" | "docker" | "projects" | "agent" | "approvals" | "history" | "admin" | "settings";
+interface NavItem { id: ViewId; label: string; icon: React.FC<any>; count?: "projects" | "containers" | "ports" | "approvals" | "stacks" }
 
 const groups: Array<{ label: string; items: NavItem[] }> = [
-  { label: "Workspace", items: [{ id: "overview", label: "Overview", icon: Home }, { id: "workspaces", label: "Workspaces", icon: FolderKanban, count: "projects" }, { id: "topology", label: "Topology", icon: Network }] },
+  { label: "Workspace", items: [{ id: "overview", label: "Overview", icon: Home }, { id: "stacks", label: "Stacks", icon: FolderKanban, count: "stacks" }, { id: "workspaces", label: "Workspaces", icon: Archive, count: "projects" }, { id: "topology", label: "Topology", icon: Network }] },
   { label: "Runtime", items: [{ id: "activity", label: "Observability", icon: Activity }, { id: "containers", label: "Containers", icon: Container, count: "containers" }, { id: "processes", label: "Processes", icon: Terminal }, { id: "ports", label: "Ports", icon: Route, count: "ports" }] },
   { label: "Manage", items: [{ id: "files", label: "Files", icon: FileCode2 }, { id: "docker", label: "Docker resources", icon: Box }, { id: "projects", label: "Registry", icon: Archive }, { id: "agent", label: "Ask agent", icon: Sparkles }] },
   { label: "Safety", items: [{ id: "approvals", label: "Approvals", icon: ShieldCheck, count: "approvals" }, { id: "history", label: "Audit log", icon: History }, { id: "admin", label: "Admin", icon: Bot }, { id: "settings", label: "Settings", icon: Settings }] },
 ];
+
 const viewTitles = Object.fromEntries(groups.flatMap((group) => group.items.map((item) => [item.id, item.label]))) as Record<ViewId, string>;
 const validViews = new Set(Object.keys(viewTitles));
 
@@ -60,9 +62,9 @@ export function ControlPlane() {
   }, []);
 
   const refreshCounts = useCallback(async () => {
-    const settled = await Promise.allSettled([api<unknown[]>("/projects"), api<unknown[]>("/containers"), api<unknown[]>("/ports"), api<Array<{ status?: string }>>("/approvals")]);
+    const settled = await Promise.allSettled([api<unknown[]>("/projects"), api<unknown[]>("/containers"), api<unknown[]>("/ports"), api<Array<{ status?: string }>>("/approvals"), api<unknown[]>("/stacks")]);
     const value = (index: number) => settled[index].status === "fulfilled" ? (settled[index] as PromiseFulfilledResult<unknown[]>).value : [];
-    setCounts({ projects: value(0).length, containers: value(1).length, ports: value(2).length, approvals: (value(3) as Array<{ status?: string }>).filter((item) => item.status === "pending").length });
+    setCounts({ projects: value(0).length, containers: value(1).length, ports: value(2).length, approvals: (value(3) as Array<{ status?: string }>).filter((item) => item.status === "pending").length, stacks: value(4).length });
     setLastSync(new Date());
   }, []);
 
@@ -90,6 +92,7 @@ export function ControlPlane() {
     const shared = { refreshKey };
     switch (view) {
       case "overview": return <OverviewView {...shared} onNavigate={navigate} />;
+      case "stacks": return <StacksView {...shared} notify={notify} />;
       case "workspaces": return <ProjectsView {...shared} notify={notify} />;
       case "topology": return <TopologyView {...shared} notify={notify} />;
       case "activity": return <ObservabilityView {...shared} notify={notify} />;
@@ -106,6 +109,7 @@ export function ControlPlane() {
       case "settings": return <SettingsView {...shared} />;
     }
   }, [navigate, notify, refreshKey, view]);
+
 
   return (
     <div className={classes("app-shell", collapsed && "sidebar-collapsed")}>

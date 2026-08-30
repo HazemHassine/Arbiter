@@ -120,3 +120,78 @@ export interface FileContent extends JsonRecord {
   sha256: string;
   kind?: string;
 }
+
+export interface ReadinessGate extends JsonRecord {
+  probe_type: "tcp_port" | "http_get" | "docker_health";
+  host?: string;
+  port?: number | null;
+  path?: string | null;
+  timeout_seconds?: number;
+  retry_interval_seconds?: number;
+  expected_status?: number;
+  service?: string | null;
+}
+
+export interface ReadinessProbeResult extends JsonRecord {
+  service?: string | null;
+  probe_type: string;
+  target: string;
+  healthy: boolean;
+  latency_ms?: number;
+  status_code?: number | null;
+  message?: string | null;
+  checked_at?: string;
+}
+
+export interface StackProjectMember extends JsonRecord {
+  project_id: string;
+  project_name: string;
+  env_overrides?: Record<string, string>;
+  depends_on?: string[];
+  readiness_gates?: ReadinessGate[];
+  boot_stage?: number;
+}
+
+export interface StackPreset extends JsonRecord {
+  id: string;
+  name: string;
+  description?: string | null;
+  projects: StackProjectMember[];
+  is_active: boolean;
+  status: string;
+  tags?: string[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface BootOrderStage extends JsonRecord {
+  stage: number;
+  projects: string[];
+  readiness_gates?: ReadinessGate[];
+  description?: string | null;
+}
+
+export interface StackBootPlan extends JsonRecord {
+  stack_id: string;
+  stack_name: string;
+  stages: BootOrderStage[];
+  total_stages: number;
+  dependencies_valid: boolean;
+  cycle_detected: boolean;
+  error?: string | null;
+}
+
+export interface StackSwitchResult extends JsonRecord {
+  id: string;
+  previous_stack_id?: string | null;
+  target_stack_id: string;
+  stopped_projects: string[];
+  started_projects: string[];
+  port_reconciliations: Array<JsonRecord>;
+  env_changes: Array<JsonRecord>;
+  readiness_results: ReadinessProbeResult[];
+  status: string;
+  verified: boolean;
+  error?: string | null;
+}
+

@@ -286,5 +286,78 @@ def mcp_server() -> None:
     run_mcp()
 
 
+stack_app = typer.Typer(help="Manage and switch multi-project stack presets.", no_args_is_help=True)
+app.add_typer(stack_app, name="stack")
+
+
+@stack_app.command("list")
+def stack_list(seed_defaults: bool = False) -> None:
+    """List all configured stack presets."""
+    svc = services().stacks
+    if seed_defaults:
+        svc.seed_default_presets()
+    emit([item.model_dump(mode="json") for item in svc.list_stacks()])
+
+
+@stack_app.command("inspect")
+def stack_inspect(identifier: str) -> None:
+    """Inspect a stack preset details, projects, and active status."""
+    emit(services().stacks.get_stack(identifier).model_dump(mode="json"))
+
+
+@stack_app.command("boot-order")
+def stack_boot_order(identifier: str) -> None:
+    """Show computed topological boot order and readiness gates for a stack preset."""
+    stack = services().stacks.get_stack(identifier)
+    emit(services().stacks.compute_boot_plan(stack).model_dump(mode="json"))
+
+
+@stack_app.command("readiness")
+def stack_readiness(identifier: str) -> None:
+    """Check live readiness gates for all projects in a stack preset."""
+    emit([item.model_dump(mode="json") for item in services().stacks.check_stack_readiness(identifier)])
+
+
+@stack_app.command("switch")
+def stack_switch(
+    identifier: str,
+    hibernate: bool = True,
+    wait: bool = True,
+    resolve_ports: bool = True,
+) -> None:
+    """1-Click switch environment context to a target stack preset."""
+    emit(
+        services()
+        .stacks.switch_stack(
+            identifier,
+            hibernate_current=hibernate,
+            wait_for_readiness=wait,
+            resolve_port_conflicts=resolve_ports,
+        )
+        .model_dump(mode="json")
+    )
+
+
+@stack_app.command("stop")
+def stack_stop(identifier: str, hibernate: bool = True) -> None:
+    """Stop or hibernate all projects in a stack preset."""
+    emit(services().stacks.stop_stack(identifier, hibernate=hibernate))
+
+
+@stack_app.command("create")
+def stack_create(
+    name: str,
+    description: str | None = None,
+    projects: Annotated[list[str] | None, typer.Option(help="Project names/IDs to include")] = None,
+) -> None:
+    """Create a new stack preset."""
+    proj_members = [{"project_id": p, "project_name": p} for p in (projects or [])]
+    emit(
+        services()
+        .stacks.create_stack(name=name, description=description, projects=proj_members)
+        .model_dump(mode="json")
+    )
+
+
 def main() -> None:
     app()

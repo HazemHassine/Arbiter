@@ -72,6 +72,30 @@ class ResourceFilterRequest(BaseModel):
     use_ai: bool = True
 
 
+class CreateStackRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    description: str | None = Field(default=None, max_length=1000)
+    projects: list[dict[str, Any]] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
+
+
+class UpdateStackRequest(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    projects: list[dict[str, Any]] | None = None
+    tags: list[str] | None = None
+
+
+class SwitchStackRequest(BaseModel):
+    hibernate_current: bool = True
+    wait_for_readiness: bool = True
+    resolve_port_conflicts: bool = True
+
+
+class StopStackRequest(BaseModel):
+    hibernate: bool = True
+
+
 def create_app(settings: Settings | None = None, services: Services | None = None) -> FastAPI:
     configured = settings or (services.settings if services else get_settings())
     validate_bind_host(configured.arbiter_host, configured.allow_remote_access)
@@ -254,8 +278,107 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     def observation_status(services: Dep) -> dict[str, Any]:
         return services.observer.status() if services.observer else {"running": False}
 
+    @router.get("/stacks")
+    def list_stacks(services: Dep) -> list[dict[str, Any]]:
+        return [item.model_dump(mode="json") for item in services.stacks.list_stacks()]
+
+    @router.post("/stacks", status_code=201)
+    def create_stack(body: CreateStackRequest, services: Dep) -> dict[str, Any]:
+        return services.stacks.create_stack(
+            name=body.name,
+            description=body.description,
+            projects=body.projects,
+            tags=body.tags,
+        ).model_dump(mode="json")
+
+    @router.post("/stacks/seed-defaults")
+    def seed_default_stacks(services: Dep) -> list[dict[str, Any]]:
+        return [item.model_dump(mode="json") for item in services.stacks.seed_default_presets()]
+
+    @router.get("/stacks/active")
+    def get_active_stack(services: Dep) -> dict[str, Any] | None:
+        active = services.stacks.get_active_stack()
+        return active.model_dump(mode="json") if active else None
+
+    @router.get("/stacks/{identifier}")
+    def get_stack(identifier: str, services: Dep) -> dict[str, Any]:
+        try:
+            return services.stacks.get_stack(identifier).model_dump(mode="json")
+        except LookupError as exc:
+            raise HTTPException(404, str(exc)) from exc
+
+    @router.put("/stacks/{identifier}")
+    def update_stack(identifier: str, body: UpdateStackRequest, services: Dep) -> dict[str, Any]:
+        try:
+            return services.stacks.update_stack(
+                identifier,
+                name=body.name,
+                description=body.description,
+                projects=body.projects,
+                tags=body.tags,
+            ).model_dump(mode="json")
+        except LookupError as exc:
+            raise HTTPException(404, str(exc)) from exc
+
+    @router.delete("/stacks/{identifier}")
+    def delete_stack(identifier: str, services: Dep) -> dict[str, bool]:
+        success = services.stacks.delete_stack(identifier)
+        if not success:
+            raise HTTPException(404, f"Stack not found: {identifier}")
+        return {"deleted": True}
+
+    @router.get("/stacks/{identifier}/boot-order")
+    def get_stack_boot_order(identifier: str, services: Dep) -> dict[str, Any]:
+        try:
+            stack = services.stacks.get_stack(identifier)
+            return services.stacks.compute_boot_plan(stack).model_dump(mode="json")
+        except LookupError as exc:
+            raise HTTPException(404, str(exc)) from exc
+
+    @router.get("/stacks/{identifier}/readiness")
+    def get_stack_readiness(identifier: str, services: Dep) -> list[dict[str, Any]]:
+        try:
+            results = services.stacks.check_stack_readiness(identifier)
+            return [res.model_dump(mode="json") for res in results]
+        except LookupError as exc:
+            raise HTTPException(404, str(exc)) from exc
+
+    @router.post("/stacks/{identifier}/switch")
+    def switch_stack(identifier: str, body: SwitchStackRequest, services: Dep) -> dict[str, Any]:
+        try:
+            stack = services.stacks.get_stack(identifier)
+        except LookupError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        spec = ActionSpec(
+            action="stack.switch",
+            risk=Risk.MEDIUM_RISK,
+            summary=f"Switch environment context to stack preset '{stack.name}'",
+            arguments={
+                "stack_id": stack.id,
+                "hibernate_current": body.hibernate_current,
+                "wait_for_readiness": body.wait_for_readiness,
+                "resolve_port_conflicts": body.resolve_port_conflicts,
+            },
+        )
+        return services.actions.propose(spec)
+
+    @router.post("/stacks/{identifier}/stop")
+    def stop_stack(identifier: str, body: StopStackRequest, services: Dep) -> dict[str, Any]:
+        try:
+            stack = services.stacks.get_stack(identifier)
+        except LookupError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        spec = ActionSpec(
+            action="stack.stop",
+            risk=Risk.LOW_RISK,
+            summary=f"Stop/hibernate stack preset '{stack.name}'",
+            arguments={"stack_id": stack.id, "hibernate": body.hibernate},
+        )
+        return services.actions.propose(spec)
+
     @router.get("/projects")
     def projects(services: Dep) -> list[dict[str, Any]]:
+
         return [item.model_dump(mode="json") for item in services.projects.list_projects()]
 
     @router.post("/projects", status_code=201)

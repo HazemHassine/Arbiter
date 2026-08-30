@@ -4,7 +4,7 @@ import { ActivityLogIcon as Activity, ArrowRightIcon as ArrowRight, CubeIcon as 
 
 import { useResource } from "@/hooks/use-resource";
 import { formatDate } from "@/lib/format";
-import type { Approval, Container, JsonRecord, PortOwner, Project, SystemEvent } from "@/lib/types";
+import type { Approval, Container, JsonRecord, PortOwner, Project, StackPreset, SystemEvent } from "@/lib/types";
 import { Button, EmptyState, ErrorNotice, LoadingRows, MetricCard, PageHeader, Panel, PanelHeader, ResourceGlyph, StatusBadge } from "@/components/ui";
 
 export function OverviewView({ onNavigate, refreshKey }: { onNavigate: (view: string) => void; refreshKey: number }) {
@@ -12,11 +12,13 @@ export function OverviewView({ onNavigate, refreshKey }: { onNavigate: (view: st
   const projects = useResource<Project[]>("/projects", [], refreshKey);
   const containers = useResource<Container[]>("/containers", [], refreshKey);
   const approvals = useResource<Approval[]>("/approvals", [], refreshKey);
+  const stacks = useResource<StackPreset[]>("/stacks", [], refreshKey);
   const activity = useResource<SystemEvent[]>("/activity?limit=8", [], refreshKey);
   const resources = useResource<JsonRecord>("/system/resources", {}, refreshKey);
   const running = containers.data.filter((item) => item.state === "running").length;
   const pending = approvals.data.filter((item) => item.status === "pending").length;
-  const error = ports.error || projects.error || containers.error;
+  const error = ports.error || projects.error || containers.error || stacks.error;
+
 
   return (
     <>
@@ -53,6 +55,39 @@ export function OverviewView({ onNavigate, refreshKey }: { onNavigate: (view: st
           <ResourceBars resources={resources.data} loading={resources.loading} />
         </Panel>
         <Panel className="span-2">
+          <PanelHeader
+            title="Multi-Project Stacks & Environment Switcher"
+            description="Manage operational environment presets with dynamic .env port binding & readiness gates"
+            action={
+              <button className="text-button" onClick={() => onNavigate("stacks")}>
+                View all stacks <ArrowRight />
+              </button>
+            }
+          />
+          {stacks.loading ? (
+            <LoadingRows count={2} />
+          ) : stacks.data.length ? (
+            <div className="resource-list">
+              {stacks.data.slice(0, 4).map((stack) => (
+                <button key={stack.id} onClick={() => onNavigate("stacks")}>
+                  <ResourceGlyph type="project" />
+                  <span>
+                    <strong>{stack.name}</strong>
+                    <small>{stack.description || `${stack.projects.length} member projects`}</small>
+                  </span>
+                  <StatusBadge value={stack.is_active ? "active" : stack.status || "inactive"} />
+                </button>
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              title="No stack presets"
+              description="Configure stack presets in the Stacks tab or seed standard presets."
+              icon={FolderKanban}
+            />
+          )}
+        </Panel>
+        <Panel className="span-2">
           <PanelHeader title="Workspaces" description="Registered project roots" action={<button className="text-button" onClick={() => onNavigate("workspaces")}>Manage <ArrowRight /></button>} />
           {projects.loading ? <LoadingRows count={3} /> : projects.data.length ? <div className="resource-list">{projects.data.slice(0, 5).map((project) => <button key={project.id} onClick={() => onNavigate("workspaces")}><ResourceGlyph type="project" /><span><strong>{project.name}</strong><small>{project.path}</small></span><StatusBadge value="registered" dot={false} /></button>)}</div> : <EmptyState title="No workspaces registered" description="Scan configured project roots from the Workspaces view." icon={FolderKanban} />}
         </Panel>
@@ -63,6 +98,7 @@ export function OverviewView({ onNavigate, refreshKey }: { onNavigate: (view: st
           <Button variant="primary" onClick={() => onNavigate("topology")}>Open resource map <ArrowRight /></Button>
         </Panel>
       </div>
+
     </>
   );
 }

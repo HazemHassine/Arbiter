@@ -121,6 +121,27 @@ class AgentTools:
                 "Inspect a registered project and propose safe preparation actions",
                 {"identifier": {"type": "string"}},
             ),
+            ToolSpec("stacks_list", "List configured multi-project stack presets and their active state", {}),
+            ToolSpec(
+                "stack_inspect",
+                "Inspect a stack preset details, member projects, and readiness gates",
+                {"identifier": {"type": "string"}},
+            ),
+            ToolSpec(
+                "stack_boot_order",
+                "Calculate topological boot order and readiness stages for a stack preset",
+                {"identifier": {"type": "string"}},
+            ),
+            ToolSpec(
+                "stack_readiness_check",
+                "Evaluate live health checks and readiness gates for a stack preset",
+                {"identifier": {"type": "string"}},
+            ),
+            ToolSpec(
+                "stack_switch",
+                "Switch environment context to a target stack preset with automatic port collision reconciliation",
+                {"identifier": {"type": "string"}},
+            ),
         ]
 
     def call(self, name: str, arguments: str | dict[str, Any]) -> Any:
@@ -185,4 +206,15 @@ class AgentTools:
             return services.topology.dockerfiles.inspect(project.path / path).model_dump(mode="json")
         if name == "prepare_project":
             return self.agent.prepare_project(identifier=args["identifier"])
+        if name == "stacks_list":
+            return [item.model_dump(mode="json") for item in services.stacks.list_stacks()]
+        if name == "stack_inspect":
+            return services.stacks.get_stack(args["identifier"]).model_dump(mode="json")
+        if name == "stack_boot_order":
+            stack = services.stacks.get_stack(args["identifier"])
+            return services.stacks.compute_boot_plan(stack).model_dump(mode="json")
+        if name == "stack_readiness_check":
+            return [item.model_dump(mode="json") for item in services.stacks.check_stack_readiness(args["identifier"])]
+        if name == "stack_switch":
+            return services.stacks.switch_stack(args["identifier"]).model_dump(mode="json")
         raise ValueError(f"Unknown tool: {name}")

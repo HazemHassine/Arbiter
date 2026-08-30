@@ -1,5 +1,6 @@
 import shutil
 from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
 from arbiter.compose.editor import ComposeEditor, change_env_port
@@ -29,6 +30,7 @@ class ActionService:
         *,
         files: FileService | None = None,
         impact: ImpactService | None = None,
+        stacks: Any | None = None,
     ) -> None:
         self.database, self.projects, self.ports, self.docker = database, projects, ports, docker
         self.settings = settings
@@ -38,6 +40,7 @@ class ActionService:
         self.make = MakeService()
         self.files = files
         self.impact = impact
+        self.stacks = stacks
 
     def propose(self, spec: ActionSpec) -> dict[str, object]:
         impact = self.impact.analyze(spec) if self.impact else None
@@ -225,6 +228,21 @@ class ActionService:
         if spec.action == "volume.remove":
             result = self.docker.remove_volume(args["identifier"])
             return result, {"verified": result["verified"]}
+        if spec.action == "stack.switch":
+            if not self.stacks:
+                raise RuntimeError("Stack preset service is unavailable")
+            res = self.stacks.switch_stack(
+                args["stack_id"],
+                hibernate_current=args.get("hibernate_current", True),
+                wait_for_readiness=args.get("wait_for_readiness", True),
+                resolve_port_conflicts=args.get("resolve_port_conflicts", True),
+            )
+            return res.model_dump(mode="json"), {"verified": res.verified, "status": res.status}
+        if spec.action == "stack.stop":
+            if not self.stacks:
+                raise RuntimeError("Stack preset service is unavailable")
+            res = self.stacks.stop_stack(args["stack_id"], hibernate=args.get("hibernate", True))
+            return res, {"verified": True, "status": res["status"]}
         raise ValueError(f"Unsupported action: {spec.action}")
 
     def _project_compose(self, project_id: str):
