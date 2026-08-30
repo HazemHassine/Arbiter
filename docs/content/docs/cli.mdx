@@ -46,6 +46,15 @@ arbiter logs container-name --tail 200
 # View Docker disk usage statistics
 arbiter disk
 
+# Audit configuration and port drift across projects
+arbiter config drift
+
+# Audit configuration drift for a specific project
+arbiter config drift project-name
+
+# Safe audit of missing environment variables and masked credentials
+arbiter config audit project-name
+
 # Approve an action by its specific ID
 arbiter approve APPROVAL_ID
 

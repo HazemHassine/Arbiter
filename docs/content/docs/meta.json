@@ -1,0 +1,11 @@
+{
+  "title": "Documentation",
+  "pages": [
+    "index",
+    "architecture",
+    "config-secrets-intelligence",
+    "configuration",
+    "cli",
+    "ui"
+  ]
+}

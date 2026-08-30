@@ -40,6 +40,7 @@ The application is a single Python process. It does not require Redis, Celery, K
 - `topology`, `system`, and `events`: generate a live, typed machine graph from Compose/Docker metadata, `/proc`, `ss`, and Docker events; runtime state is not persisted as authoritative data.
 - `docker` and `compose`: typed Docker SDK inspection, Compose label awareness, lifecycle operations, validation, and structured port editing.
 - `dockerfile`, `make`, `files`, and `impact`: Dockerfile and Make intelligence, safe registered-project editing with backup/diff/rollback/undo, and deterministic pre-operation impact summaries.
+- `config_intelligence`: cross-file port drift detection (`.env` vs `compose.yaml` vs `.env.example`), credential-safe missing env variable auditing, and visual diff dry-run time-travel state forecasting.
 - `safety`, `actions`, and `persistence`: immutable persisted approvals, one typed action dispatcher, history, and mandatory verification outcomes.
 - `agent`: deterministic intents plus LangChain v1's `create_agent` runtime, backed by LangGraph and restricted to the control plane's typed tools.
 - `api`, `cli`, and `integrations`: thin adapters over the same services.
