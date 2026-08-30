@@ -146,6 +146,18 @@ arbiter config audit project-name
 # Approve an action by its specific ID
 arbiter approve APPROVAL_ID
 
+# Multi-Project Stacks & Environment Switcher
+arbiter stack list --seed-defaults
+arbiter stack inspect "Billing Microservices"
+arbiter stack boot-order "Billing Microservices"
+arbiter stack readiness "Billing Microservices"
+arbiter stack switch "AI Pipeline + Vector DB"
+arbiter stack stop "AI Pipeline + Vector DB"
+
 # Start the MCP stdio adapter
 arbiter mcp
 ```
+
+## Output Format
+
+The CLI outputs structured JSON for machine-readable operations. This enables scripting and automation, while maintaining identical business logic as the API and browser control panel.

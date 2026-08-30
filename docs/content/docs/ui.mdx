@@ -25,7 +25,7 @@ pipeline.
 
 The sidebar groups the application into four areas:
 
-- **Workspace:** Overview, Workspaces, and Topology.
+- **Workspace:** Overview, Stacks, Workspaces, and Topology.
 - **Runtime:** Observability, Containers, Processes, and Ports.
 - **Manage:** Files, Docker resources, Registry, and Ask agent.
 - **Safety:** Approvals, Audit log, Admin, and Settings.
@@ -39,11 +39,21 @@ with `Cmd+K` or `Ctrl+K`.
 ### Overview and Workspaces
 
 The overview summarizes listeners, registered projects, containers, approvals,
-host capacity, recent activity, and quick actions. Workspace views connect
+host capacity, recent activity, active stack presets, and quick actions. Workspace views connect
 registered and runtime-discovered projects with their Compose services and
 resource evidence.
 
+### Multi-Project Stacks & Environment Switcher
+
+The Stacks view (`#stacks`) manages operational environment profiles:
+- **Active Stack Banner**: Real-time indicator of the running stack preset.
+- **Stack Presets Grid**: Preset cards with project members, tags, and 1-click switcher buttons.
+- **Boot Order DAG Visualizer**: Shows dependency boot stages computed via Kahn's algorithm.
+- **Readiness Gate Cards**: Displays real-time TCP socket, HTTP endpoint, and Docker container health checks with latency metrics.
+- **Context Switch Stepper Modal**: Provides step-by-step visibility into stopped projects, dynamic `.env` override injection, port reconciliations, and readiness verification.
+
 ### Topology
+
 
 The topology canvas links projects, Compose files and services, containers,
 images, volumes, networks, ports, host processes, Dockerfiles, and Make targets.

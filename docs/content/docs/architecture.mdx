@@ -21,9 +21,9 @@ Browser UI       TUI / CLI       REST clients       MCP clients       A2A client
                     Agent and high-level orchestration
                                   │
         ┌───────────┬───────────┬───────────┬───────────┐
-        │ Projects  │   Ports   │  Docker   │ Compose   │
+        │ Projects  │  Stacks   │   Ports   │  Docker   │
         ├───────────┼───────────┼───────────┼───────────┤
-        │ Makefiles │  System   │  Safety   │ Actions   │
+        │  Compose  │ Makefiles │  System   │  Safety   │
         └───────────┴───────────┴───────────┴───────────┘
                                   │
              Linux /proc + ss    Docker SDK    SQLite    project files
@@ -37,6 +37,7 @@ The application is a single Python process. It does not require Redis, Celery, K
 
 - `ports`: parses Linux `ss`, resolves processes through `/proc`, correlates Docker/Compose metadata, finds predictable free ports, and detects duplicate project claims and runtime port collisions.
 - `projects`: bounded discovery below configured roots and a refreshable SQLite registry. No whole-filesystem scan occurs.
+- `stacks`: multi-project environment profiles, 1-click context switching with dynamic `.env` override injection, port collision reconciliation, and topological DAG boot order orchestration.
 - `topology`, `system`, and `events`: generate a live, typed machine graph from Compose/Docker metadata, `/proc`, `ss`, and Docker events; runtime state is not persisted as authoritative data.
 - `docker` and `compose`: typed Docker SDK inspection, Compose label awareness, lifecycle operations, validation, and structured port editing.
 - `dockerfile`, `make`, `files`, and `impact`: Dockerfile and Make intelligence, safe registered-project editing with backup/diff/rollback/undo, and deterministic pre-operation impact summaries.
@@ -72,7 +73,9 @@ Examples of verification include:
 - confirming a removed image or volume no longer exists;
 - refreshing project configuration after a port change;
 - checking the recreated service is running;
-- checking the new host port has the expected owner.
+- checking the new host port has the expected owner;
+- verifying stack readiness gates (`tcp_port`, `http_get`, `docker_health`) and checking measured endpoint latency.
+
 
 ## Security Boundaries
 

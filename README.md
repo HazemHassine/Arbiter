@@ -122,6 +122,9 @@ The code under `src/arbiter` is split into domain services:
   collisions.
 - `projects`: bounded discovery below configured roots and a refreshable SQLite
   registry. No whole-filesystem scan occurs.
+- `stacks`: multi-project environment profiles, 1-click context switching with
+  dynamic `.env` override injection, port collision reconciliation, and
+  topological DAG boot order orchestration with live readiness gates.
 - `topology`, `system`, and `events`: generate a live, typed machine graph from
   Compose/Docker metadata, `/proc`, `ss`, and Docker events; runtime state is not
   persisted as authoritative data.
@@ -139,7 +142,7 @@ The code under `src/arbiter` is split into domain services:
 SQLite stores registered projects, approvals, action history, and agent-request
 schema. Docker logs are returned on demand and are not persisted.
 
-## Port and project APIs
+## Port, project, and stack APIs
 
 ```bash
 curl http://127.0.0.1:8765/api/v1/ports/5432
@@ -147,6 +150,7 @@ curl 'http://127.0.0.1:8765/api/v1/ports/free?start=3000&end=4000&count=5'
 curl http://127.0.0.1:8765/api/v1/ports/conflicts
 curl http://127.0.0.1:8765/api/v1/projects/PROJECT_ID/reconciliation-plan
 
+# Register and prepare projects
 curl -X POST http://127.0.0.1:8765/api/v1/projects \
   -H 'Content-Type: application/json' \
   -d '{"path":"/home/user/dev/github-analysis"}'
@@ -154,7 +158,16 @@ curl -X POST http://127.0.0.1:8765/api/v1/projects \
 curl -X POST http://127.0.0.1:8765/api/v1/projects/prepare \
   -H 'Content-Type: application/json' \
   -d '{"path":"/home/user/dev/github-analysis","resolve_port_conflicts":true,"start":true,"verify":true}'
+
+# Multi-project stack presets and 1-click context switching
+curl http://127.0.0.1:8765/api/v1/stacks
+curl http://127.0.0.1:8765/api/v1/stacks/STACK_ID/boot-order
+curl http://127.0.0.1:8765/api/v1/stacks/STACK_ID/readiness
+curl -X POST http://127.0.0.1:8765/api/v1/stacks/STACK_ID/switch \
+  -H 'Content-Type: application/json' \
+  -d '{"hibernate_current":true,"wait_for_readiness":true,"resolve_port_conflicts":true}'
 ```
+
 
 Natural language queries use real service observations:
 
@@ -251,6 +264,14 @@ arbiter topology
 arbiter processes
 arbiter runtimes
 arbiter disk
+
+# Multi-project stack presets and 1-click switcher
+arbiter stack list --seed-defaults
+arbiter stack inspect "Billing Microservices"
+arbiter stack boot-order "Billing Microservices"
+arbiter stack readiness "Billing Microservices"
+arbiter stack switch "AI Pipeline + Vector DB"
+arbiter stack stop "AI Pipeline + Vector DB"
 ```
 
 ## MCP and A2A
@@ -308,9 +329,10 @@ ARBITER_RUN_DOCKER_TESTS=1 uv run pytest -m docker
   diff/approval editor instead.
 - Project startup supports Compose directly. Unknown/custom startup commands are
   inspected but never guessed or executed automatically.
-- Health verification uses container state, Docker health, refreshed config, and
-  observed port ownership; application-specific HTTP/database probes require a
-  future project health-profile configuration.
+- Health verification uses container state, Docker health, refreshed config,
+  observed port ownership, and stack readiness gates (TCP socket probes, HTTP
+  endpoint checks, and Docker container health).
 - Docker is the fully supported runtime. Podman and nerdctl/containerd are
   detected and reported as inspection-only capability signals rather than treated
   as feature-equivalent runtimes.
+

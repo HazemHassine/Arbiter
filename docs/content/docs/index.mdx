@@ -44,6 +44,7 @@ For full details, see the [CLI & Terminal Ergonomics Documentation](/docs/cli).
 - The observability workspace can tail a selected container, filter or pause output, inspect a runtime metrics snapshot, and render likely HTTP listeners in an embedded preview with a new-tab fallback. Logs and metrics remain on demand and are never persisted by the control plane.
 - Dockerfile and Makefile inspection provide deterministic metadata and conservative diagnostics; the LLM layer only sits above typed read-only tools.
 - Smart Config & Secrets Intelligence audits `.env` vs `compose.yaml` and `.env.example` to detect port drift, missing variables, and unconfigured placeholders with credential masking and dry-run visual diffs.
+- Multi-project stack presets group repositories into operational environments (e.g. *Billing Microservices*, *AI Pipeline + Vector DB*, *Frontend App + Mock API*) with 1-click context switching, dynamic `.env` port binding, and dependency readiness gates (TCP sockets, HTTP endpoints, Docker health).
 - Optional resource-query interpretation uses `FILTER_LLM_MODEL` (default `gpt-5.4-nano`) to produce a strict typed filter plan. Matching is still local and deterministic, and automatically falls back to the built-in parser.
 
 ## Register and prepare a project
@@ -55,3 +56,10 @@ uv run arbiter approve APPROVAL_ID
 ```
 
 The preparation operation inspects Compose configuration and real listening ports. Conflicting host ports produce deterministic alternatives and a persisted approval. Approval executes exactly the stored arguments, backs up configuration, validates it, recreates only affected services, and records post-action checks.
+
+## Switch multi-project stack presets
+
+```bash
+# Switch to a complete operational stack with zero port collisions and readiness verification
+uv run arbiter stack switch "AI Pipeline + Vector DB"
+```

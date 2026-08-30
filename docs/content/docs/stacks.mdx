@@ -1,0 +1,127 @@
+---
+title: Stack Presets & Switcher
+description: Multi-project environment profiles, 1-click context switching, and dependency readiness gates
+---
+
+# Multi-Project Stack Presets & Environment Switcher
+
+Developers rarely work on just one isolated repository; they switch between distinct multi-service environments throughout the day (e.g. *Billing Microservices*, *AI Pipeline + Vector DB*, or *Frontend App + Mock API*).
+
+Arbiter provides a **Multi-Project Stack Preset & Environment Switcher** subsystem that groups related projects into operational profiles, performs seamless 1-click context switching with dynamic `.env` port binding, and enforces topological boot ordering with live dependency readiness gates.
+
+---
+
+## Key Capabilities
+
+### 1. Multi-Project Environment Profiles
+Group multiple workspace repositories and Compose services into named stack profiles:
+- **Billing Microservices**: Payment Gateway, Webhook Handlers, Redis Queue, and Postgres Ledger.
+- **AI Pipeline + Vector DB**: Qdrant Vector Store, Embedding Generator Worker, and FastAPI LLM Gateway.
+- **Frontend App + Mock API**: Next.js / Vite Single Page Application paired with Local Mock API Server.
+
+Stack profiles are persisted in SQLite and can be created, updated, inspected, or deleted via the UI, CLI, REST API, or AI Agent.
+
+### 2. 1-Click Context Switcher
+Switching from Stack A to Stack B executes a safe, atomic transition:
+1. **Hibernate/Spin Down Previous Stack**: Automatically stops unneeded containers from the outgoing stack to free system memory, CPU, and host ports.
+2. **Dynamic `.env` Overrides**: Injects stack-specific environment variables (e.g. `PORT=8001`, `DB_PORT=5432`) directly into project `.env` files with automatic timestamped backups (`.env.bak.<timestamp>`).
+3. **Dynamic Port Collision Reconciliation**: Detects port conflicts against real listening host sockets and rewrites Compose or `.env` host port bindings to deterministic free ports before booting.
+4. **Staged Boot Sequence**: Boots member projects stage-by-stage following topological dependencies.
+
+### 3. Dependency Health Checks & Readiness Gates
+Instead of booting all containers concurrently and suffering race conditions (e.g. backend crashing because database isn't ready), Arbiter organizes the boot sequence into a directed acyclic graph (DAG):
+- **Topological Sorting**: Uses Kahn's algorithm to calculate boot stages (Stage 0: databases/queues, Stage 1: APIs, Stage 2: workers/frontends) with cycle detection.
+- **Multi-Probe Readiness Checks**:
+  - `tcp_port`: Real-time socket connection test measuring connect latency in milliseconds.
+  - `http_get`: HTTP endpoint probe verifying expected HTTP status codes (e.g. `200 OK`) and latency.
+  - `docker_health`: Live container status inspection (`running`, `healthy`).
+- **Readiness Wait Loop**: Downstream boot stages wait until upstream readiness gates pass or timeout.
+
+---
+
+## Browser UI
+
+The **Stacks** view in the Arbiter Control Panel (`http://127.0.0.1:8765/#stacks`) provides an interactive interface:
+
+- **Active Stack Banner**: Real-time indicator displaying the currently active environment preset.
+- **Stack Preset Cards**: Grid of configured stacks showing member projects, dependency links, tags, and status.
+- **1-Click Switch Button**: Triggers the context switch workflow with live progress updates.
+- **Boot Order DAG Visualizer**: Visual pipeline of boot stages, showing the exact boot sequence and dependencies.
+- **Live Readiness Gates**: Interactive cards for each health check with real-time status pills (`OK`, `FAIL`, `PENDING`) and measured latency in milliseconds.
+- **Context Switch Stepper Modal**: Step-by-step audit of stopped projects, `.env` overrides applied, port reconciliations, and readiness gate checks.
+- **Preset Creator Modal**: Form to define custom multi-project presets, configure environment overrides, and set readiness probes.
+
+---
+
+## CLI Reference
+
+The `arbiter stack` command group manages stack presets from the terminal:
+
+```bash
+# List all stack presets (optionally seed standard default presets if empty)
+arbiter stack list --seed-defaults
+
+# Inspect a specific stack preset
+arbiter stack inspect "Billing Microservices"
+
+# View the computed topological boot stages and readiness gates
+arbiter stack boot-order "Billing Microservices"
+
+# Probe all readiness gates for a stack preset in real time
+arbiter stack readiness "Billing Microservices"
+
+# 1-Click switch to a target stack preset
+arbiter stack switch "AI Pipeline + Vector DB"
+
+# Switch without waiting for readiness gates or without hibernating current stack
+arbiter stack switch "AI Pipeline + Vector DB" --no-wait --no-hibernate
+
+# Stop or hibernate an active stack preset
+arbiter stack stop "AI Pipeline + Vector DB"
+
+# Create a new custom stack preset
+arbiter stack create "Custom Analytics" \
+  --description "ClickHouse and Python dashboard" \
+  --projects clickhouse-db \
+  --projects analytics-api \
+  --tags analytics --tags data
+```
+
+---
+
+## REST API Reference
+
+The Stacks subsystem exposes standard REST endpoints under `/api/v1/stacks`:
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/stacks` | List all stack presets |
+| `POST` | `/api/v1/stacks` | Create a new stack preset |
+| `POST` | `/api/v1/stacks/seed-defaults` | Seed standard environment presets |
+| `GET` | `/api/v1/stacks/active` | Get currently active stack |
+| `GET` | `/api/v1/stacks/{id}` | Inspect a stack preset by ID or name |
+| `PUT` | `/api/v1/stacks/{id}` | Update stack metadata, projects, or tags |
+| `DELETE` | `/api/v1/stacks/{id}` | Delete a stack preset |
+| `GET` | `/api/v1/stacks/{id}/boot-order` | Compute topological boot stages & gates |
+| `GET` | `/api/v1/stacks/{id}/readiness` | Check live readiness gates |
+| `POST` | `/api/v1/stacks/{id}/switch` | Propose 1-click context switch action |
+| `POST` | `/api/v1/stacks/{id}/stop` | Propose stop/hibernate stack action |
+
+---
+
+## AI Agent Integration
+
+The natural language agent can inspect, diagnose, and switch stacks directly:
+
+```bash
+# Ask Arbiter about your stacks
+arbiter ask "What stacks are available and which one is active?"
+
+# Probe stack readiness
+arbiter ask "Check if all databases in the Billing Microservices stack are ready"
+
+# Switch stacks via natural language
+arbiter ask "Switch to the AI Pipeline stack and make sure port conflicts are resolved"
+```
+
+Agent actions route through the standard safety and approval pipeline with full audit trails.
