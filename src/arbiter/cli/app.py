@@ -6,6 +6,7 @@ from typing import Annotated
 import typer
 
 from arbiter.agent.service import AgentService
+from arbiter.cli.picker import pick_approval, pick_container, pick_project
 from arbiter.config import get_settings
 from arbiter.security import validate_bind_host
 from arbiter.services import build_services
@@ -13,6 +14,8 @@ from arbiter.services import build_services
 app = typer.Typer(help="Arbiter: safe local environment understanding and reconciliation.", no_args_is_help=True)
 config_app = typer.Typer(help="Configuration, .env, and secrets intelligence.", no_args_is_help=True)
 app.add_typer(config_app, name="config")
+prompt_app = typer.Typer(help="Shell prompt and Starship integration.", invoke_without_command=True)
+app.add_typer(prompt_app, name="prompt")
 
 
 def services():
@@ -70,9 +73,21 @@ def projects(scan: bool = False) -> None:
 
 
 @app.command("inspect")
-def inspect_project(identifier: str) -> None:
-    """Inspect a registered project."""
-    emit(services().projects.refresh_project(identifier).model_dump(mode="json"))
+def inspect_project(
+    identifier: Annotated[str | None, typer.Argument(help="Registered project identifier or path")] = None,
+) -> None:
+    """Inspect a registered project. Opens fuzzy picker if identifier is omitted."""
+    svc = services().projects
+    if not identifier:
+        available = svc.list_projects()
+        if not available:
+            raise typer.BadParameter("No registered projects found. Use 'arbiter register <path>' first.")
+        selected = pick_project(available, prompt="Select Project to Inspect")
+        if not selected:
+            raise typer.BadParameter("No project selected.")
+        identifier = selected.id
+
+    emit(svc.refresh_project(identifier).model_dump(mode="json"))
 
 
 @app.command()
@@ -82,8 +97,20 @@ def register(path: Path) -> None:
 
 
 @app.command()
-def prepare(identifier: str) -> None:
-    """Inspect and safely propose preparation of a project."""
+def prepare(
+    identifier: Annotated[str | None, typer.Argument(help="Registered project identifier or directory name")] = None,
+) -> None:
+    """Inspect and safely propose preparation of a project. Opens fuzzy picker if omitted."""
+    svc = services().projects
+    if not identifier:
+        available = svc.list_projects()
+        if not available:
+            raise typer.BadParameter("No registered projects found. Use 'arbiter register <path>' first.")
+        selected = pick_project(available, prompt="Select Project to Prepare")
+        if not selected:
+            raise typer.BadParameter("No project selected.")
+        identifier = selected.id
+
     emit(AgentService(services()).prepare_project(identifier=identifier))
 
 
@@ -159,9 +186,22 @@ def runtimes() -> None:
 
 
 @app.command()
-def logs(identifier: str, tail: int = 200) -> None:
-    """Read bounded container logs."""
-    typer.echo(services().docker.logs(identifier, tail))
+def logs(
+    identifier: Annotated[str | None, typer.Argument(help="Container identifier or name")] = None,
+    tail: int = 200,
+) -> None:
+    """Read bounded container logs. Opens fuzzy container selector if omitted."""
+    docker_svc = services().docker
+    if not identifier:
+        available = docker_svc.list_containers()
+        if not available:
+            raise typer.BadParameter("No Docker containers found.")
+        selected = pick_container(available, prompt="Select Container for Logs")
+        if not selected:
+            raise typer.BadParameter("No container selected.")
+        identifier = selected.id
+
+    typer.echo(docker_svc.logs(identifier, tail))
 
 
 @app.command()
@@ -171,9 +211,71 @@ def disk() -> None:
 
 
 @app.command()
-def approve(approval_id: str) -> None:
-    """Approve and execute exactly one persisted action."""
-    emit(services().actions.approve_and_execute(approval_id).model_dump(mode="json"))
+def approve(
+    approval_id: Annotated[str | None, typer.Argument(help="Pending action approval ID")] = None,
+) -> None:
+    """Approve and execute exactly one persisted action. Opens fuzzy selector if omitted."""
+    action_svc = services().actions
+    if not approval_id:
+        pending = [a for a in action_svc.approvals.list() if a.status == "pending"]
+        if not pending:
+            raise typer.BadParameter("No pending approvals found.")
+        selected = pick_approval(pending, prompt="Select Pending Approval to Execute")
+        if not selected:
+            raise typer.BadParameter("No approval selected.")
+        approval_id = selected.id
+
+    emit(action_svc.approve_and_execute(approval_id).model_dump(mode="json"))
+
+
+@app.command()
+def tui() -> None:
+    """Launch the interactive Terminal UI (lazydocker/k9s style)."""
+    from arbiter.tui.app import run_tui
+
+    run_tui(services())
+
+
+@prompt_app.callback(invoke_without_command=True)
+def prompt_status(
+    ctx: typer.Context,
+    format: Annotated[
+        str,
+        typer.Option("--format", "-f", help="Output format: pill, starship, json, plain, short"),
+    ] = "pill",
+    color: Annotated[bool, typer.Option("--color/--no-color", help="Enable/disable ANSI colors")] = True,
+    status_only: Annotated[
+        bool,
+        typer.Option("--status-only", help="Exit code 0 if healthy, 1 if warnings/conflicts"),
+    ] = False,
+) -> None:
+    """Output shell prompt status pill."""
+    if ctx.invoked_subcommand is not None:
+        return
+    from arbiter.cli.prompt import format_prompt_status, get_prompt_status
+
+    status = get_prompt_status(services())
+    output = format_prompt_status(status, output_format=format, color=color)
+    typer.echo(output)
+    if status_only and status.status != "ok":
+        raise typer.Exit(code=1)
+
+
+@prompt_app.command("init")
+def prompt_init(
+    shell: Annotated[
+        str,
+        typer.Argument(help="Shell or tool type: starship, zsh, bash, fish"),
+    ] = "starship",
+) -> None:
+    """Generate shell prompt hook configuration snippet."""
+    from arbiter.cli.prompt import generate_shell_init
+
+    try:
+        snippet = generate_shell_init(shell)
+        typer.echo(snippet)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
 
 
 @app.command("mcp")
