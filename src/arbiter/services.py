@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from arbiter.actions.service import ActionService
 from arbiter.config import Settings
+from arbiter.config_intelligence.service import ConfigIntelligenceService
 from arbiter.docker.service import DockerService
 from arbiter.events.service import EventBus, ObservationService
 from arbiter.files.service import FileService
@@ -30,6 +31,7 @@ class Services:
     runtimes: RuntimeService
     events: EventBus
     telemetry: TelemetryRegistry
+    config_intelligence: ConfigIntelligenceService | None = None
     observer: ObservationService | None = None
 
 
@@ -64,5 +66,7 @@ def build_services(settings: Settings, docker: DockerService | None = None, scan
         EventBus(),
         TelemetryRegistry(),
     )
+    services.config_intelligence = ConfigIntelligenceService(services)
+    impact.config_intelligence = services.config_intelligence
     services.observer = ObservationService(services, services.events, settings.observation_interval_seconds)
     return services

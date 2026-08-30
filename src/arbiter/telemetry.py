@@ -116,10 +116,7 @@ class TelemetryRegistry:
                     "p95": round(_percentile(latencies, 0.95), 2),
                 },
                 "statuses": dict(statuses),
-                "routes": [
-                    {"route": route, "count": count}
-                    for route, count in routes.most_common(12)
-                ],
+                "routes": [{"route": route, "count": count} for route, count in routes.most_common(12)],
                 "samples": requests[-90:],
             },
             "llm": {

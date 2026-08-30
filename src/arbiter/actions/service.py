@@ -41,17 +41,24 @@ class ActionService:
 
     def propose(self, spec: ActionSpec) -> dict[str, object]:
         impact = self.impact.analyze(spec) if self.impact else None
+        time_travel = impact.get("time_travel") if impact else None
         if needs_approval(spec.risk, self.settings):
             approval = self.approvals.create(spec)
             public_approval = approval.model_dump(mode="json")
             public_approval["arguments"] = redact_action_arguments(approval.action, approval.arguments)
+            if time_travel:
+                public_approval["time_travel"] = time_travel
             response: dict[str, object] = {"status": "approval_required", "approval": public_approval}
             if impact:
                 response["impact"] = impact
+            if time_travel:
+                response["time_travel"] = time_travel
             return response
         response = {"status": "completed", "action": self.execute(spec).model_dump(mode="json")}
         if impact:
             response["impact"] = impact
+        if time_travel:
+            response["time_travel"] = time_travel
         return response
 
     def approve_and_execute(self, approval_id: str) -> ActionResult:

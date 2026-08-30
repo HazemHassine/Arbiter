@@ -90,11 +90,14 @@ class AgentTools:
                 "Build a read-only deterministic port reconciliation plan for a registered project",
                 {"identifier": {"type": "string"}},
             ),
+            ToolSpec(
+                "config_drift_audit",
+                "Audit a project for .env and Compose configuration drift, port divergences, and missing variables",
+                {"identifier": {"type": "string"}},
+            ),
             ToolSpec("list_ports", "List real listening ports and owners", {}),
             ToolSpec("find_port_owner", "Find the real owner of a TCP port", {"port": {"type": "integer"}}),
-            ToolSpec(
-                "find_free_port", "Find a deterministic free host port", {"preferred_port": {"type": "integer"}}
-            ),
+            ToolSpec("find_free_port", "Find a deterministic free host port", {"preferred_port": {"type": "integer"}}),
             ToolSpec("list_projects", "List registered projects", {}),
             ToolSpec("detect_port_conflicts", "Find duplicate registered project port claims", {}),
             ToolSpec("containers_list", "List Docker containers", {}),
@@ -136,6 +139,11 @@ class AgentTools:
         if name == "project_reconciliation_plan":
             project = services.projects.refresh_project(args["identifier"])
             return services.ports.plan_port_reconciliation(project).model_dump(mode="json")
+        if name == "config_drift_audit":
+            identifier = args.get("identifier")
+            if identifier:
+                return services.config_intelligence.audit_project_config(identifier).model_dump(mode="json")
+            return [item.model_dump(mode="json") for item in services.config_intelligence.audit_all_projects()]
         if name == "list_ports":
             return [item.model_dump(mode="json") for item in services.ports.list_used_ports()]
         if name == "find_port_owner":

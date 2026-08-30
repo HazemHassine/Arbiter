@@ -96,10 +96,7 @@ class AgentService:
     def diagnose_project(self, identifier: str) -> dict[str, object]:
         project = self.services.projects.refresh_project(identifier)
         plan = self.services.ports.plan_port_reconciliation(project)
-        issues = [
-            {"type": "port_conflict", **change.model_dump(mode="json")}
-            for change in plan.changes
-        ]
+        issues = [{"type": "port_conflict", **change.model_dump(mode="json")} for change in plan.changes]
         try:
             containers = [
                 item for item in self.services.docker.list_containers() if item.compose_working_dir == str(project.path)
@@ -276,9 +273,7 @@ class AgentService:
             "detail": "Checking deterministic capabilities before invoking a model.",
         }
         deterministic = self.query(message)
-        deterministic_match = bool(deterministic["observations"]) or "not covered" not in str(
-            deterministic["message"]
-        )
+        deterministic_match = bool(deterministic["observations"]) or "not covered" not in str(deterministic["message"])
         if deterministic_match:
             yield {
                 "type": "step_completed",

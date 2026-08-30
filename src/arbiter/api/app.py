@@ -238,6 +238,18 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
+    @router.get("/config-drift")
+    def global_config_drift(services: Dep) -> list[dict[str, Any]]:
+        if not services.config_intelligence:
+            return []
+        return [item.model_dump(mode="json") for item in services.config_intelligence.audit_all_projects()]
+
+    @router.get("/projects/{identifier}/config-drift")
+    def project_config_drift(identifier: str, services: Dep) -> dict[str, Any]:
+        if not services.config_intelligence:
+            raise LookupError("Config intelligence service unavailable")
+        return services.config_intelligence.audit_project_config(identifier).model_dump(mode="json")
+
     @router.get("/observation")
     def observation_status(services: Dep) -> dict[str, Any]:
         return services.observer.status() if services.observer else {"running": False}
@@ -569,11 +581,11 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
 
     @router.get("/approvals")
     def approvals(services: Dep) -> list[dict[str, Any]]:
-        return [_public_approval(item) for item in services.actions.approvals.list()]
+        return [_public_approval(item, services) for item in services.actions.approvals.list()]
 
     @router.get("/approvals/{approval_id}")
     def approval(approval_id: str, services: Dep) -> dict[str, Any]:
-        return _public_approval(services.actions.approvals.get(approval_id))
+        return _public_approval(services.actions.approvals.get(approval_id), services)
 
     @router.post("/approvals/{approval_id}/approve")
     def approve(approval_id: str, services: Dep) -> dict[str, Any]:
@@ -636,9 +648,23 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     return app
 
 
-def _public_approval(approval) -> dict[str, Any]:
+def _public_approval(approval, services: Services | None = None) -> dict[str, Any]:
     result = approval.model_dump(mode="json")
     result["arguments"] = redact_action_arguments(approval.action, approval.arguments)
+    if services and services.config_intelligence:
+        try:
+            spec = ActionSpec(
+                request_id=approval.request_id,
+                action=approval.action,
+                arguments=approval.arguments,
+                summary=approval.summary,
+                risk=approval.risk,
+                project_id=approval.arguments.get("project_id"),
+            )
+            preview = services.config_intelligence.build_time_travel_preview(spec)
+            result["time_travel"] = preview.model_dump(mode="json")
+        except Exception:
+            pass
     return result
 
 

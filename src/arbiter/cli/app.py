@@ -11,6 +11,8 @@ from arbiter.security import validate_bind_host
 from arbiter.services import build_services
 
 app = typer.Typer(help="Arbiter: safe local environment understanding and reconciliation.", no_args_is_help=True)
+config_app = typer.Typer(help="Configuration, .env, and secrets intelligence.", no_args_is_help=True)
+app.add_typer(config_app, name="config")
 
 
 def services():
@@ -18,7 +20,7 @@ def services():
 
 
 def emit(value) -> None:
-    typer.echo(json.dumps(value, indent=2, default=str))
+    typer.echo(json.dumps(value, indent=2, default=str, ensure_ascii=False))
 
 
 @app.command()
@@ -83,6 +85,47 @@ def register(path: Path) -> None:
 def prepare(identifier: str) -> None:
     """Inspect and safely propose preparation of a project."""
     emit(AgentService(services()).prepare_project(identifier=identifier))
+
+
+@config_app.command("drift")
+def config_drift(identifier: Annotated[str | None, typer.Argument(help="Optional project name or ID")] = None) -> None:
+    """Audit project(s) for port drifts and missing variables."""
+    svc = services().config_intelligence
+    if identifier:
+        emit(svc.audit_project_config(identifier).model_dump(mode="json"))
+    else:
+        emit([item.model_dump(mode="json") for item in svc.audit_all_projects()])
+
+
+@config_app.command("audit")
+def config_audit(identifier: Annotated[str | None, typer.Argument(help="Optional project name or ID")] = None) -> None:
+    """Safe secrets and environment auditing (masked credentials)."""
+    svc = services().config_intelligence
+    if identifier:
+        report = svc.audit_project_config(identifier)
+        emit(
+            {
+                "project": report.project_name,
+                "status": report.status,
+                "drift_score": report.drift_score,
+                "env_audit": [v.model_dump(mode="json") for v in report.env_audit],
+                "recommendations": report.recommendations,
+            }
+        )
+    else:
+        reports = svc.audit_all_projects()
+        emit(
+            [
+                {
+                    "project": r.project_name,
+                    "status": r.status,
+                    "drift_score": r.drift_score,
+                    "missing_count": len(r.missing_env_vars),
+                    "port_drifts_count": len(r.port_drifts),
+                }
+                for r in reports
+            ]
+        )
 
 
 @app.command()

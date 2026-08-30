@@ -6,14 +6,20 @@ from arbiter.topology.models import RelationshipType, ResourceNode
 
 
 class ImpactService:
-    def __init__(self, topology) -> None:
+    def __init__(self, topology, *, config_intelligence=None) -> None:
         self.topology = topology
+        self.config_intelligence = config_intelligence
 
     def analyze(self, spec: ActionSpec) -> dict[str, Any]:
         graph = self.topology.graph()
         target = self._target(spec, graph.nodes)
+        time_travel = (
+            self.config_intelligence.build_time_travel_preview(spec).model_dump(mode="json")
+            if self.config_intelligence
+            else None
+        )
         if not target:
-            return {
+            result = {
                 "action": spec.action,
                 "known": False,
                 "summary": (
@@ -21,6 +27,9 @@ class ImpactService:
                 ),
                 "affected": [],
             }
+            if time_travel:
+                result["time_travel"] = time_travel
+            return result
         related = self._related(target.id, graph.edges, graph.nodes, depth=2)
         dependencies = [
             edge.source
@@ -48,7 +57,7 @@ class ImpactService:
             summary_parts.append(
                 "This operation can remove data or a reusable runtime artifact; it remains explicitly approved."
             )
-        return {
+        result = {
             "action": spec.action,
             "known": True,
             "target": {"type": target.resource_type.value, "id": target.resource_id, "label": target.label},
@@ -59,6 +68,9 @@ class ImpactService:
             "affected": affected,
             "summary": " ".join(summary_parts),
         }
+        if time_travel:
+            result["time_travel"] = time_travel
+        return result
 
     @staticmethod
     def _target(spec: ActionSpec, nodes: list[ResourceNode]) -> ResourceNode | None:

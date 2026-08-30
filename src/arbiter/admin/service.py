@@ -68,12 +68,8 @@ class AdminService:
                 name: int(session.scalar(select(func.count()).select_from(table)) or 0)
                 for name, table in tables.items()
             }
-            action_statuses = Counter(
-                str(status) for status in session.scalars(select(ActionRow.status)).all()
-            )
-            approval_statuses = Counter(
-                str(status) for status in session.scalars(select(ApprovalRow.status)).all()
-            )
+            action_statuses = Counter(str(status) for status in session.scalars(select(ActionRow.status)).all())
+            approval_statuses = Counter(str(status) for status in session.scalars(select(ApprovalRow.status)).all())
         url = make_url(self.services.settings.database_url)
         result: dict[str, Any] = {
             "backend": url.get_backend_name(),

@@ -175,9 +175,7 @@ class PortService:
                 )
         return claims
 
-    def _suggest_unclaimed_port(
-        self, preferred_port: int, protocol: str, reserved: set[tuple[int, str]]
-    ) -> int:
+    def _suggest_unclaimed_port(self, preferred_port: int, protocol: str, reserved: set[tuple[int, str]]) -> int:
         ranges = (
             range(preferred_port + 1, self.settings.default_port_search_range_end + 1),
             range(self.settings.default_port_search_range_start, preferred_port),

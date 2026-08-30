@@ -9,9 +9,7 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", populate_by_name=True)
 
-    arbiter_host: str = Field(
-        default="127.0.0.1", validation_alias=AliasChoices("ARBITER_HOST", "DEV_AGENT_HOST")
-    )
+    arbiter_host: str = Field(default="127.0.0.1", validation_alias=AliasChoices("ARBITER_HOST", "DEV_AGENT_HOST"))
     arbiter_port: int = Field(default=8765, validation_alias=AliasChoices("ARBITER_PORT", "DEV_AGENT_PORT"))
     allow_remote_access: bool = False
     database_url: str = "sqlite:///./arbiter.db"

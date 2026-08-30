@@ -125,34 +125,32 @@ class IntelligenceService:
             if resource_type and resource_type not in types:
                 types.append(resource_type)
         ports = sorted(
-            {
-                int(value)
-                for value in re.findall(r"(?:\bport[: ]|:)(\d{1,5})\b", lowered)
-                if 0 < int(value) < 65536
-            }
+            {int(value) for value in re.findall(r"(?:\bport[: ]|:)(\d{1,5})\b", lowered) if 0 < int(value) < 65536}
         )
         statuses = [value for value in re.findall(r"\bstatus:([a-z_-]+)", lowered)]
         if "running" in tokens and "running" not in statuses:
             statuses.append("running")
-        project_terms = [value.strip('"\'') for value in re.findall(r"\bproject:([^\s]+)", lowered)]
+        project_terms = [value.strip("\"'") for value in re.findall(r"\bproject:([^\s]+)", lowered)]
         relationship_names = {item.value.casefold(): item for item in RelationshipType}
         relationships = [
-            relationship
-            for name, relationship in relationship_names.items()
-            if name in lowered.replace(" ", "_")
+            relationship for name, relationship in relationship_names.items() if name in lowered.replace(" ", "_")
         ]
-        reserved = set(cls._type_aliases) | cls._stop_words | {
-            "active",
-            "broken",
-            "conflict",
-            "conflicts",
-            "failed",
-            "issue",
-            "issues",
-            "running",
-            "status",
-            "type",
-        }
+        reserved = (
+            set(cls._type_aliases)
+            | cls._stop_words
+            | {
+                "active",
+                "broken",
+                "conflict",
+                "conflicts",
+                "failed",
+                "issue",
+                "issues",
+                "running",
+                "status",
+                "type",
+            }
+        )
         terms = [
             token
             for token in tokens
