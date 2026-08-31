@@ -140,7 +140,21 @@ export interface ReadinessProbeResult extends JsonRecord {
   latency_ms?: number;
   status_code?: number | null;
   message?: string | null;
+  policy_status: "allowed" | "approval_required" | "blocked";
+  policy_reason?: string | null;
+  resolved_addresses?: string[];
   checked_at?: string;
+}
+
+export interface ReadinessAuthorization extends JsonRecord {
+  id: string;
+  target_key: string;
+  protocol: string;
+  host: string;
+  port: number;
+  resolved_addresses: string[];
+  approval_id: string;
+  created_at: string;
 }
 
 export interface StackProjectMember extends JsonRecord {
@@ -194,4 +208,3 @@ export interface StackSwitchResult extends JsonRecord {
   verified: boolean;
   error?: string | null;
 }
-

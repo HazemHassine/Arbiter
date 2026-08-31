@@ -25,6 +25,7 @@ import { classes } from "@/lib/format";
 import type {
   Project,
   ReadinessGate,
+  ReadinessAuthorization,
   ReadinessProbeResult,
   StackBootPlan,
   StackPreset,
@@ -43,6 +44,7 @@ export function StacksView({ refreshKey = 0, notify }: StacksViewProps) {
   const [selectedStackId, setSelectedStackId] = useState<string | null>(null);
   const [bootPlan, setBootPlan] = useState<StackBootPlan | null>(null);
   const [readinessResults, setReadinessResults] = useState<ReadinessProbeResult[]>([]);
+  const [readinessAuthorizations, setReadinessAuthorizations] = useState<ReadinessAuthorization[]>([]);
   const [loading, setLoading] = useState(true);
   const [probing, setProbing] = useState(false);
   const [switchingId, setSwitchingId] = useState<string | null>(null);
@@ -58,14 +60,16 @@ export function StacksView({ refreshKey = 0, notify }: StacksViewProps) {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [stacksData, activeData, projectsData] = await Promise.all([
+      const [stacksData, activeData, projectsData, authorizationsData] = await Promise.all([
         api<StackPreset[]>("/stacks"),
         api<StackPreset | null>("/stacks/active"),
         api<Project[]>("/projects"),
+        api<ReadinessAuthorization[]>("/readiness/authorizations"),
       ]);
       setStacks(stacksData);
       setActiveStack(activeData);
       setProjects(projectsData);
+      setReadinessAuthorizations(authorizationsData);
 
       const targetId = selectedStackId || activeData?.id || stacksData[0]?.id;
       if (targetId) {
@@ -125,6 +129,32 @@ export function StacksView({ refreshKey = 0, notify }: StacksViewProps) {
     }
   };
 
+  const handleRequestProbeAccess = async () => {
+    if (!selectedStackId) return;
+    try {
+      const requests = await post<Array<{ approval: { id: string } }>>(
+        `/stacks/${selectedStackId}/readiness/authorizations`,
+      );
+      notify?.(
+        requests.length ? `Created ${requests.length} scoped readiness approval request(s)` : "No new access is required",
+        requests.length ? "info" : "success",
+      );
+    } catch (err: any) {
+      notify?.(err?.message || "Failed to request readiness access", "error");
+    }
+  };
+
+  const handleRevokeProbeAccess = async (authorization: ReadinessAuthorization) => {
+    if (!confirm(`Revoke readiness access to ${authorization.host}:${authorization.port}?`)) return;
+    try {
+      await remove(`/readiness/authorizations/${authorization.id}`);
+      notify?.(`Revoked readiness access to ${authorization.host}:${authorization.port}`, "success");
+      void loadData();
+    } catch (err: any) {
+      notify?.(err?.message || "Failed to revoke readiness access", "error");
+    }
+  };
+
   const handleSwitchStack = async (stack: StackPreset) => {
     setSwitchingId(stack.id);
     try {
@@ -136,6 +166,9 @@ export function StacksView({ refreshKey = 0, notify }: StacksViewProps) {
 
       if (res?.status === "approval_required") {
         notify?.(`Switch proposed (Approval ${res.approval.id})`, "info");
+      } else if (res?.status === "readiness_access_required") {
+        setReadinessResults(res.readiness as ReadinessProbeResult[]);
+        notify?.("Authorize the highlighted readiness destinations before switching", "info");
       } else if (res?.action?.result) {
         const switchRes = res.action.result as StackSwitchResult;
         setSwitchModalResult(switchRes);
@@ -351,6 +384,11 @@ export function StacksView({ refreshKey = 0, notify }: StacksViewProps) {
                 <Button variant="secondary" disabled={probing} onClick={handleRunProbes}>
                   <RefreshCw className={probing ? "spin" : ""} /> Run Readiness Probes
                 </Button>
+                {readinessResults.some((result) => result.policy_status === "approval_required") ? (
+                  <Button variant="primary" onClick={handleRequestProbeAccess}>
+                    <AlertTriangle /> Request Probe Access
+                  </Button>
+                ) : null}
               </div>
             }
           />
@@ -417,8 +455,8 @@ export function StacksView({ refreshKey = 0, notify }: StacksViewProps) {
                                     <div className="gate-name-row">
                                       <b>{gate.service || `${gate.probe_type}`}</b>
                                       {probeResult ? (
-                                        <span className={classes("gate-status-pill", probeResult.healthy ? "ok" : "fail")}>
-                                          {probeResult.healthy ? "HEALTHY" : "OFFLINE"}
+                                        <span className={classes("gate-status-pill", probeResult.healthy ? "ok" : probeResult.policy_status === "approval_required" ? "pending" : "fail")}>
+                                          {probeResult.healthy ? "HEALTHY" : probeResult.policy_status === "approval_required" ? "ACCESS NEEDED" : probeResult.policy_status === "blocked" ? "BLOCKED" : "OFFLINE"}
                                         </span>
                                       ) : (
                                         <span className="gate-status-pill pending">READY GATE</span>
@@ -433,7 +471,7 @@ export function StacksView({ refreshKey = 0, notify }: StacksViewProps) {
                                     </p>
                                     {probeResult ? (
                                       <small className="gate-meta">
-                                        {probeResult.message} ({probeResult.latency_ms}ms)
+                                        {probeResult.message}{probeResult.policy_status === "allowed" ? ` (${probeResult.latency_ms}ms)` : ""}
                                       </small>
                                     ) : (
                                       <small className="gate-meta">Awaits health confirmation</small>
@@ -457,6 +495,26 @@ export function StacksView({ refreshKey = 0, notify }: StacksViewProps) {
           )}
         </Panel>
       ) : null}
+
+      <Panel className="readiness-access-panel">
+        <PanelHeader
+          title="Readiness Network Access"
+          description="Persisted grants are limited to one protocol, host, port, and resolved IP set. Loopback requires no grant."
+        />
+        {readinessAuthorizations.length ? (
+          <div className="readiness-access-list">
+            {readinessAuthorizations.map((authorization) => (
+              <div className="readiness-access-row" key={authorization.id}>
+                <div>
+                  <strong>{authorization.protocol.toUpperCase()} {authorization.host}:{authorization.port}</strong>
+                  <small>{authorization.resolved_addresses.join(", ")} · approval {authorization.approval_id.slice(0, 8)}</small>
+                </div>
+                <Button variant="ghost" onClick={() => void handleRevokeProbeAccess(authorization)}><X /> Revoke</Button>
+              </div>
+            ))}
+          </div>
+        ) : <EmptyState title="No non-local probe access" description="Loopback probes work automatically. Other destinations require approval." icon={Wrench} />}
+      </Panel>
 
       {/* Switch Result Stepper Modal */}
       {switchModalResult ? (

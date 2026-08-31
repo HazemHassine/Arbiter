@@ -45,7 +45,7 @@ A fast, keyboard-driven Terminal UI (like lazydocker / k9s) letting you navigate
 ```bash
 arbiter tui
 ```
-- **Tabs**: `[1] Ports`, `[2] Containers`, `[3] Approvals`, `[4] Projects`, `[5] Logs` (Switch with `1..5` or `Tab`)
+- **Tabs**: `[1] Ports`, `[2] Containers`, `[3] Approvals`, `[4] Projects`, `[5] Logs`, `[6] Readiness` (Switch with `1..6` or `Tab`)
 - **Keybindings**: `j`/`k` (navigate), `Enter` (inspect / drill down), `a` (approve action), `l` (jump to logs), `p` (prepare project), `r` (refresh), `/` (search), `?` (help), `q` (quit).
 
 ### 2. Interactive CLI Pickers with Fuzzy Search
@@ -124,7 +124,10 @@ The code under `src/arbiter` is split into domain services:
   registry. No whole-filesystem scan occurs.
 - `stacks`: multi-project environment profiles, 1-click context switching with
   dynamic `.env` override injection, port collision reconciliation, and
-  topological DAG boot order orchestration with live readiness gates.
+  topological DAG boot order orchestration with policy-controlled live readiness
+  gates. Loopback and registered Compose-service probes are automatic; other
+  destinations require a persisted protocol/host/port/IP approval. Link-local,
+  metadata, multicast, unspecified, and reserved destinations are always blocked.
 - `topology`, `system`, and `events`: generate a live, typed machine graph from
   Compose/Docker metadata, `/proc`, `ss`, and Docker events; runtime state is not
   persisted as authoritative data.
@@ -212,6 +215,14 @@ Interactive API documentation is available at `/docs`, `/redoc`, and
 `/openapi.json`. Docker inspection endpoints cover containers, bounded logs,
 stats, images, volumes and their users, networks and members, and disk usage.
 State-changing endpoints all feed the approval/action service.
+
+Readiness probes never use an unvalidated hostname for the network connection.
+Arbiter resolves and classifies the destination first, connects to the validated
+IP directly, sends the original hostname only as the HTTP `Host` header, and
+revalidates every redirect. Scoped non-local grants can be reviewed or revoked
+from the UI, TUI, CLI, or REST API.
+Stack switching preflights this policy and performs no mutations while a required
+readiness authorization is missing.
 
 ## Safety model
 
@@ -335,4 +346,3 @@ ARBITER_RUN_DOCKER_TESTS=1 uv run pytest -m docker
 - Docker is the fully supported runtime. Podman and nerdctl/containerd are
   detected and reported as inspection-only capability signals rather than treated
   as feature-equivalent runtimes.
-

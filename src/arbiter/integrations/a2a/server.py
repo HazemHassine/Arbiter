@@ -16,6 +16,7 @@ AGENT_CARD = {
         {"id": "resolve_port_conflicts", "name": "Resolve port conflicts"},
         {"id": "diagnose_project", "name": "Diagnose local environment"},
         {"id": "inspect_docker", "name": "Inspect Docker state"},
+        {"id": "check_stack_readiness", "name": "Check policy-controlled stack readiness"},
     ],
     "taskEndpoint": "/api/v1/projects/{id}/prepare",
 }
@@ -30,4 +31,11 @@ class A2AAdapter:
             return self.agent.prepare_project(identifier=project)
         if skill == "diagnose_project":
             return self.agent.diagnose_project(project)
+        if skill == "check_stack_readiness":
+            return {
+                "readiness": [
+                    item.model_dump(mode="json")
+                    for item in self.agent.services.stacks.check_stack_readiness(project)
+                ]
+            }
         raise ValueError(f"Unsupported A2A skill: {skill}")

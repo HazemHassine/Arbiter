@@ -4,15 +4,16 @@ import json
 from dataclasses import dataclass, field
 from typing import Any
 
-from arbiter.models import ApprovalInfo, ContainerInfo, PortOwner, Project
+from arbiter.models import ApprovalInfo, ContainerInfo, PortOwner, Project, ReadinessAuthorization
 
 TAB_PORTS = 0
 TAB_CONTAINERS = 1
 TAB_APPROVALS = 2
 TAB_PROJECTS = 3
 TAB_LOGS = 4
+TAB_READINESS = 5
 
-TAB_NAMES = ["Ports", "Containers", "Approvals", "Projects", "Logs"]
+TAB_NAMES = ["Ports", "Containers", "Approvals", "Projects", "Logs", "Readiness"]
 
 
 @dataclass
@@ -22,6 +23,7 @@ class TUIData:
     containers: list[ContainerInfo] = field(default_factory=list)
     approvals: list[ApprovalInfo] = field(default_factory=list)
     projects: list[Project] = field(default_factory=list)
+    readiness_authorizations: list[ReadinessAuthorization] = field(default_factory=list)
 
 
 @dataclass
@@ -34,6 +36,7 @@ class TUIState:
             TAB_APPROVALS: 0,
             TAB_PROJECTS: 0,
             TAB_LOGS: 0,
+            TAB_READINESS: 0,
         }
     )
     filter_queries: dict[int, str] = field(
@@ -43,6 +46,7 @@ class TUIState:
             TAB_APPROVALS: "",
             TAB_PROJECTS: "",
             TAB_LOGS: "",
+            TAB_READINESS: "",
         }
     )
     is_filtering: bool = False
@@ -105,6 +109,10 @@ def format_project_row(p: Project) -> tuple[str, str, str, str]:
     return name, services_count, ports_count, path_str
 
 
+def format_readiness_authorization_row(item: ReadinessAuthorization) -> tuple[str, str, str, str]:
+    return item.id[:8], item.protocol.upper(), f"{item.host}:{item.port}", ",".join(item.resolved_addresses)
+
+
 def get_item_details(data: TUIData, state: TUIState, selected_item: Any) -> str:
     """Produce pretty formatted JSON / detail text for the inspector pane."""
     if not selected_item:
@@ -112,9 +120,7 @@ def get_item_details(data: TUIData, state: TUIState, selected_item: Any) -> str:
 
     if state.active_tab == TAB_PORTS and isinstance(selected_item, PortOwner):
         p = selected_item
-        conflicts = [
-            c for c in data.conflicts if c.get("port") == p.port and c.get("protocol") == p.protocol
-        ]
+        conflicts = [c for c in data.conflicts if c.get("port") == p.port and c.get("protocol") == p.protocol]
         return json.dumps(
             {
                 "port": p.port,
@@ -202,5 +208,8 @@ def get_item_details(data: TUIData, state: TUIState, selected_item: Any) -> str:
             indent=2,
             default=str,
         )
+
+    if state.active_tab == TAB_READINESS and isinstance(selected_item, ReadinessAuthorization):
+        return json.dumps(selected_item.model_dump(mode="json"), indent=2, default=str)
 
     return str(selected_item)

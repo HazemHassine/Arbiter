@@ -16,6 +16,8 @@ def test_agent_tools_definitions(service_factory):
     assert "list_projects" in names
     assert "containers_list" in names
     assert "topology_get" in names
+    assert "stack_readiness_request_access" in names
+    assert "readiness_authorizations_list" in names
 
 
 def test_agent_tools_call_execution(service_factory):

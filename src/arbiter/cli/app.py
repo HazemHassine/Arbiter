@@ -313,9 +313,33 @@ def stack_boot_order(identifier: str) -> None:
 
 
 @stack_app.command("readiness")
-def stack_readiness(identifier: str) -> None:
+def stack_readiness(
+    identifier: str,
+    request_access: Annotated[
+        bool, typer.Option("--request-access", help="Create approvals for non-local readiness destinations")
+    ] = False,
+) -> None:
     """Check live readiness gates for all projects in a stack preset."""
-    emit([item.model_dump(mode="json") for item in services().stacks.check_stack_readiness(identifier)])
+    stacks = services().stacks
+    probes = [item.model_dump(mode="json") for item in stacks.check_stack_readiness(identifier)]
+    if request_access:
+        emit({"probes": probes, "authorization_requests": stacks.request_readiness_authorizations(identifier)})
+        return
+    emit(probes)
+
+
+@stack_app.command("readiness-access")
+def stack_readiness_access(
+    revoke: Annotated[str | None, typer.Option("--revoke", help="Revoke one persisted authorization by ID")] = None,
+) -> None:
+    """List or revoke narrowly scoped readiness destination authorizations."""
+    policy = services().stacks.readiness_policy
+    if revoke:
+        if not policy.revoke(revoke):
+            raise typer.BadParameter(f"Readiness authorization not found: {revoke}")
+        emit({"revoked": True, "id": revoke})
+        return
+    emit([item.model_dump(mode="json") for item in policy.list()])
 
 
 @stack_app.command("switch")

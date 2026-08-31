@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 def utcnow() -> datetime:
@@ -149,15 +149,38 @@ class ReadinessProbeType(StrEnum):
     DOCKER_HEALTH = "docker_health"
 
 
+class ReadinessPolicyStatus(StrEnum):
+    ALLOWED = "allowed"
+    APPROVAL_REQUIRED = "approval_required"
+    BLOCKED = "blocked"
+
+
 class ReadinessGate(BaseModel):
     probe_type: ReadinessProbeType = ReadinessProbeType.TCP_PORT
     host: str = "127.0.0.1"
-    port: int | None = None
+    port: int | None = Field(default=None, ge=1, le=65535)
     path: str | None = None
-    timeout_seconds: float = 10.0
-    retry_interval_seconds: float = 0.5
-    expected_status: int = 200
+    timeout_seconds: float = Field(default=10.0, gt=0, le=30)
+    retry_interval_seconds: float = Field(default=0.5, gt=0, le=10)
+    expected_status: int = Field(default=200, ge=100, le=599)
     service: str | None = None
+
+    @field_validator("host")
+    @classmethod
+    def safe_host(cls, value: str) -> str:
+        normalized = value.strip().rstrip(".")
+        if not normalized or any(char in normalized for char in "\r\n/@?#"):
+            raise ValueError("Readiness host must be a plain hostname or IP address")
+        return normalized
+
+    @field_validator("path")
+    @classmethod
+    def safe_path(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if any(char in value for char in "\r\n"):
+            raise ValueError("Readiness path contains invalid control characters")
+        return value if value.startswith("/") else f"/{value}"
 
 
 class ReadinessProbeResult(BaseModel):
@@ -168,7 +191,21 @@ class ReadinessProbeResult(BaseModel):
     latency_ms: float = 0.0
     status_code: int | None = None
     message: str | None = None
+    policy_status: ReadinessPolicyStatus = ReadinessPolicyStatus.ALLOWED
+    policy_reason: str | None = None
+    resolved_addresses: list[str] = Field(default_factory=list)
     checked_at: datetime = Field(default_factory=utcnow)
+
+
+class ReadinessAuthorization(BaseModel):
+    id: str
+    target_key: str
+    protocol: str
+    host: str
+    port: int
+    resolved_addresses: list[str] = Field(default_factory=list)
+    approval_id: str
+    created_at: datetime
 
 
 class StackProjectMember(BaseModel):

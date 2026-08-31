@@ -4,6 +4,7 @@ from typer.testing import CliRunner
 
 import arbiter.cli.app as cli_module
 from arbiter.cli.app import app
+from arbiter.models import ReadinessGate, StackProjectMember
 
 
 def test_cli_stack_commands(cli_runner: CliRunner, service_factory, monkeypatch):
@@ -54,3 +55,32 @@ def test_cli_stack_commands(cli_runner: CliRunner, service_factory, monkeypatch)
     created = json.loads(create_result.stdout)
     assert created["name"] == "Custom Pipeline"
     assert len(created["projects"]) == 2
+
+
+def test_cli_readiness_access_workflow(cli_runner: CliRunner, service_factory, monkeypatch):
+    services = service_factory()
+    monkeypatch.setattr(cli_module, "services", lambda: services)
+    monkeypatch.setattr(services.stacks.readiness_policy, "_resolve", lambda host, port: ("10.20.30.40",))
+    stack = services.stacks.create_stack(
+        "private readiness",
+        projects=[
+            StackProjectMember(
+                project_id="p1",
+                project_name="api",
+                readiness_gates=[ReadinessGate(probe_type="tcp_port", host="private.internal", port=8080)],
+            )
+        ],
+    )
+
+    request = cli_runner.invoke(app, ["stack", "readiness", stack.id, "--request-access"])
+    assert request.exit_code == 0
+    payload = json.loads(request.stdout)
+    assert payload["probes"][0]["policy_status"] == "approval_required"
+    approval_id = payload["authorization_requests"][0]["approval"]["id"]
+    services.actions.approve_and_execute(approval_id)
+
+    listed = cli_runner.invoke(app, ["stack", "readiness-access"])
+    authorization_id = json.loads(listed.stdout)[0]["id"]
+    revoked = cli_runner.invoke(app, ["stack", "readiness-access", "--revoke", authorization_id])
+    assert revoked.exit_code == 0
+    assert json.loads(revoked.stdout)["revoked"] is True

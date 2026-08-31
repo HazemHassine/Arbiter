@@ -97,7 +97,7 @@ class ActionService:
             session.add(row)
             session.commit()
         try:
-            result, verification = self._dispatch(spec, action_id)
+            result, verification = self._dispatch(spec, action_id, approval_id)
             status = "completed" if verification.get("verified") else "verification_failed"
             response = ActionResult(
                 id=action_id, action=spec.action, status=status, result=result, verification=verification
@@ -113,7 +113,7 @@ class ActionService:
             session.commit()
         return response
 
-    def _dispatch(self, spec: ActionSpec, action_id: str) -> tuple[dict, dict]:
+    def _dispatch(self, spec: ActionSpec, action_id: str, approval_id: str | None = None) -> tuple[dict, dict]:
         args = spec.arguments
         if spec.action.startswith("container."):
             result = self.docker.container_action(args["identifier"], spec.action.split(".", 1)[1])
@@ -243,6 +243,14 @@ class ActionService:
                 raise RuntimeError("Stack preset service is unavailable")
             res = self.stacks.stop_stack(args["stack_id"], hibernate=args.get("hibernate", True))
             return res, {"verified": True, "status": res["status"]}
+        if spec.action == "readiness.authorize":
+            if not self.stacks:
+                raise RuntimeError("Readiness policy service is unavailable")
+            if not approval_id:
+                raise ValueError("Readiness authorization requires a persisted approval")
+            authorization = self.stacks.readiness_policy.authorize(args, approval_id)
+            result = authorization.model_dump(mode="json")
+            return result, {"verified": True, "target_key": authorization.target_key}
         raise ValueError(f"Unsupported action: {spec.action}")
 
     def _project_compose(self, project_id: str):

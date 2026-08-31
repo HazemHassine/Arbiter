@@ -18,7 +18,7 @@ arbiter tui
 ```
 
 ### Key Features & Vim Keybindings
-- **Tabbed Views**: `[1] Ports`, `[2] Containers`, `[3] Approvals`, `[4] Projects`, `[5] Logs`.
+- **Tabbed Views**: `[1] Ports`, `[2] Containers`, `[3] Approvals`, `[4] Projects`, `[5] Logs`, `[6] Readiness`.
 - **Navigation**:
   - `j` / `k` (or `Down` / `Up`): Navigate list items.
   - `1`..`5` or `Tab`: Switch active tab.
@@ -151,6 +151,14 @@ arbiter stack list --seed-defaults
 arbiter stack inspect "Billing Microservices"
 arbiter stack boot-order "Billing Microservices"
 arbiter stack readiness "Billing Microservices"
+arbiter stack readiness "Billing Microservices" --request-access
+arbiter stack readiness-access
+arbiter stack readiness-access --revoke AUTHORIZATION_ID
+
+`readiness` reports `allowed`, `approval_required`, or `blocked` for every gate.
+`--request-access` creates ordinary safety-queue approvals only for the gates that
+need them; it never approves access automatically. The TUI's **Readiness** tab
+lists persisted grants, and `x` revokes the selected grant after confirmation.
 arbiter stack switch "AI Pipeline + Vector DB"
 arbiter stack stop "AI Pipeline + Vector DB"
 

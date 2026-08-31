@@ -134,8 +134,18 @@ class AgentTools:
             ),
             ToolSpec(
                 "stack_readiness_check",
-                "Evaluate live health checks and readiness gates for a stack preset",
+                "Evaluate readiness gates under the destination policy; denied gates never open a connection",
                 {"identifier": {"type": "string"}},
+            ),
+            ToolSpec(
+                "stack_readiness_request_access",
+                "Propose operator approvals for a stack's non-local readiness destinations",
+                {"identifier": {"type": "string"}},
+            ),
+            ToolSpec(
+                "readiness_authorizations_list",
+                "List persisted protocol, host, port, and resolved-address readiness grants",
+                {},
             ),
             ToolSpec(
                 "stack_switch",
@@ -215,6 +225,10 @@ class AgentTools:
             return services.stacks.compute_boot_plan(stack).model_dump(mode="json")
         if name == "stack_readiness_check":
             return [item.model_dump(mode="json") for item in services.stacks.check_stack_readiness(args["identifier"])]
+        if name == "stack_readiness_request_access":
+            return services.stacks.request_readiness_authorizations(args["identifier"])
+        if name == "readiness_authorizations_list":
+            return [item.model_dump(mode="json") for item in services.stacks.readiness_policy.list()]
         if name == "stack_switch":
             return services.stacks.switch_stack(args["identifier"]).model_dump(mode="json")
         raise ValueError(f"Unknown tool: {name}")

@@ -17,6 +17,7 @@ ACTION_RISKS = {
     "make.run": Risk.HIGH_RISK,
     "image.remove": Risk.HIGH_RISK,
     "volume.remove": Risk.DESTRUCTIVE,
+    "readiness.authorize": Risk.MEDIUM_RISK,
 }
 
 

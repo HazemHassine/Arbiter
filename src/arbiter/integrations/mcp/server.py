@@ -63,6 +63,21 @@ def create_server():
         """Get the connected, freshly observed workstation resource topology."""
         return services.topology.graph().model_dump(mode="json")
 
+    @server.tool(name="stack_readiness_check")
+    def stack_readiness_check(identifier: str) -> list[dict]:
+        """Check stack readiness under the destination policy; denied probes never open a connection."""
+        return [item.model_dump(mode="json") for item in services.stacks.check_stack_readiness(identifier)]
+
+    @server.tool(name="stack_readiness_request_access")
+    def stack_readiness_request_access(identifier: str) -> list[dict]:
+        """Propose persisted approvals for a stack's non-local readiness destinations."""
+        return services.stacks.request_readiness_authorizations(identifier)
+
+    @server.tool(name="readiness_authorizations_list")
+    def readiness_authorizations_list() -> list[dict]:
+        """List approved protocol, host, port, and resolved-address readiness grants."""
+        return [item.model_dump(mode="json") for item in services.stacks.readiness_policy.list()]
+
     @server.tool(name="resource_inspect")
     def resource_inspect(resource_type: str, resource_id: str) -> dict:
         """Inspect a resource and its direct topology relationships."""

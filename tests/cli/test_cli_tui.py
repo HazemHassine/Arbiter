@@ -8,6 +8,7 @@ from arbiter.models import (
     ActionSpec,
     ContainerInfo,
     PortOwner,
+    ReadinessAuthorization,
     Risk,
 )
 from arbiter.tui.app import ArbiterTUI
@@ -15,10 +16,12 @@ from arbiter.tui.views import (
     TAB_APPROVALS,
     TAB_CONTAINERS,
     TAB_PROJECTS,
+    TAB_READINESS,
     TUIData,
     TUIState,
     format_container_row,
     format_port_row,
+    format_readiness_authorization_row,
     get_item_details,
 )
 from tests.fixtures.doubles import FakeDocker
@@ -45,6 +48,21 @@ def test_tui_row_formatters():
     assert c_name == "web_api"
     assert "running" in c_state
     assert c_ps == "my-app/api"
+
+    authorization = ReadinessAuthorization(
+        id="auth-1234",
+        target_key="tcp:private.internal:8080",
+        protocol="tcp",
+        host="private.internal",
+        port=8080,
+        resolved_addresses=["10.20.30.40"],
+        approval_id="approval-1234",
+        created_at="2026-01-01T00:00:00Z",
+    )
+    assert format_readiness_authorization_row(authorization)[2] == "private.internal:8080"
+    data = TUIData(readiness_authorizations=[authorization])
+    state = TUIState(active_tab=TAB_READINESS)
+    assert "10.20.30.40" in get_item_details(data, state, authorization)
 
 
 def test_tui_state_and_details(service_factory, tmp_path: Path):
