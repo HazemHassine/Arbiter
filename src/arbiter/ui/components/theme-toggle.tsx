@@ -5,17 +5,19 @@ import { useTheme } from "next-themes";
 import * as React from "react";
 
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
+  const dark = resolvedTheme === "dark";
 
   return (
     <button
-      className="icon-button"
-      onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-      title="Toggle theme"
+      className="icon-button theme-toggle"
+      onClick={() => setTheme(dark ? "light" : "dark")}
+      aria-label={dark ? "Switch to light theme" : "Switch to dark theme"}
+      title={dark ? "Switch to light theme" : "Switch to dark theme"}
     >
-      <SunIcon className="icon-sun" style={{ display: theme === "dark" ? "none" : "block", width: "15px", height: "15px" }} />
-      <MoonIcon className="icon-moon" style={{ display: theme === "dark" ? "block" : "none", width: "15px", height: "15px" }} />
-      <span className="sr-only" style={{ display: "none" }}>Toggle theme</span>
+      <SunIcon className="icon-sun" aria-hidden="true" />
+      <MoonIcon className="icon-moon" aria-hidden="true" />
+      <span className="sr-only">{dark ? "Switch to light theme" : "Switch to dark theme"}</span>
     </button>
   );
 }

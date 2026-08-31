@@ -1,0 +1,212 @@
+/*
+ * Light theme correction layer.
+ *
+ * The original interface was drawn directly in dark colors. Keeping these
+ * overrides together makes the intended light surfaces explicit and prevents
+ * future component work from quietly inheriting a near-black background.
+ */
+:root:not(.dark) {
+  color-scheme: light;
+  --bg: #f6f7f9;
+  --bg-elevated: #eef1f5;
+  --panel: #ffffff;
+  --panel-hover: #f4f6f9;
+  --panel-strong: #e9edf2;
+  --line: #dce2e9;
+  --line-soft: #edf0f4;
+  --text: #16202c;
+  --text-2: #344255;
+  --muted: #66758a;
+  --muted-2: #8995a6;
+  --blue: #4263eb;
+  --blue-2: #2949c7;
+  --blue-soft: rgba(66, 99, 235, .09);
+  --green: #087f5b;
+  --green-soft: rgba(8, 127, 91, .09);
+  --amber: #b86200;
+  --amber-soft: rgba(184, 98, 0, .09);
+  --red: #c92a3a;
+  --red-soft: rgba(201, 42, 58, .08);
+}
+
+:root:not(.dark) body {
+  background:
+    radial-gradient(circle at 88% -8%, rgba(66, 99, 235, .055), transparent 28rem),
+    var(--bg);
+}
+
+:root:not(.dark) ::selection { background: rgba(66, 99, 235, .2); }
+:root:not(.dark) ::-webkit-scrollbar-thumb { background: #c5cdd8; background-clip: padding-box; }
+
+/* Shell and navigation */
+:root:not(.dark) .sidebar { background: rgba(250, 251, 252, .97); }
+:root:not(.dark) .topbar { background: rgba(255, 255, 255, .88); box-shadow: 0 1px 0 rgba(20, 34, 51, .025); backdrop-filter: blur(14px); }
+:root:not(.dark) .brand-mark { color: var(--blue-2); border-color: rgba(66, 99, 235, .2); background: #f4f6ff; box-shadow: 0 5px 14px rgba(41, 73, 199, .09); }
+:root:not(.dark) .collapse-button:hover,
+:root:not(.dark) .mobile-close:hover { background: var(--panel-strong); }
+:root:not(.dark) .workspace-switcher { background: var(--panel); box-shadow: 0 1px 2px rgba(20, 34, 51, .035); }
+:root:not(.dark) .workspace-switcher:hover { border-color: #bac5d2; background: var(--panel-hover); }
+:root:not(.dark) .sidebar nav section > p { color: #8290a3; }
+:root:not(.dark) .sidebar nav button { color: #536277; }
+:root:not(.dark) .sidebar nav button:hover { color: var(--text); background: #eef1f5; }
+:root:not(.dark) .sidebar nav button.active { color: #2949c7; background: var(--blue-soft); }
+:root:not(.dark) .sidebar nav button em { color: #6d7b8e; border-color: #dce2e9; background: #f5f7fa; }
+:root:not(.dark) .breadcrumbs i { color: #b3bdc9; }
+:root:not(.dark) .live-pill { color: var(--green); border-color: rgba(8, 127, 91, .18); background: var(--green-soft); }
+:root:not(.dark) .live-pill.offline { color: var(--red); border-color: rgba(201, 42, 58, .18); background: var(--red-soft); }
+
+/* Controls */
+:root:not(.dark) .command-button,
+:root:not(.dark) .icon-button,
+:root:not(.dark) .heading-select,
+:root:not(.dark) select,
+:root:not(.dark) .inline-form input,
+:root:not(.dark) .search-input,
+:root:not(.dark) .register-form input,
+:root:not(.dark) .filter-tabs,
+:root:not(.dark) .tab-bar,
+:root:not(.dark) .topology-toolbar,
+:root:not(.dark) .console-actions label,
+:root:not(.dark) .tool-cloud span,
+:root:not(.dark) .suggestion-row button,
+:root:not(.dark) .agent-rail .panel button { background: var(--panel); }
+:root:not(.dark) .command-button:hover,
+:root:not(.dark) .icon-button:hover { border-color: #aeb9c7; background: var(--panel-hover); }
+:root:not(.dark) kbd { color: #647388; border-color: #d5dce5; background: #f3f5f8; box-shadow: 0 1px 0 #fff; }
+:root:not(.dark) .button { color: #405066; border-color: #cfd7e1; background: #fff; box-shadow: 0 1px 2px rgba(20, 34, 51, .04); }
+:root:not(.dark) .button:hover:not(:disabled) { color: #182434; border-color: #aeb9c7; background: #f7f9fb; }
+:root:not(.dark) .button.primary { color: #fff; border-color: #3657da; background: #4263eb; box-shadow: 0 5px 13px rgba(41, 73, 199, .17); }
+:root:not(.dark) .button.primary:hover:not(:disabled) { border-color: #2949c7; background: #3657da; }
+:root:not(.dark) .button.danger { color: var(--red); border-color: rgba(201, 42, 58, .2); background: var(--red-soft); box-shadow: none; }
+:root:not(.dark) .button.danger:hover:not(:disabled) { color: #a61e2d; border-color: rgba(201, 42, 58, .36); background: rgba(201, 42, 58, .12); }
+:root:not(.dark) .text-button { color: var(--blue-2); }
+:root:not(.dark) .text-button:hover { color: #1f3da9; }
+
+/* Type hierarchy and cards */
+:root:not(.dark) .eyebrow { color: #60708a; }
+:root:not(.dark) .page-heading h1,
+:root:not(.dark) .panel-head h2,
+:root:not(.dark) .panel h2,
+:root:not(.dark) .table-toolbar h2,
+:root:not(.dark) .big-status strong,
+:root:not(.dark) .hero-identity h2 { color: var(--text); }
+:root:not(.dark) .panel { box-shadow: 0 1px 2px rgba(20, 34, 51, .035), 0 8px 28px rgba(20, 34, 51, .035); }
+:root:not(.dark) .panel:hover { border-color: #d2d9e2; }
+:root:not(.dark) .hero-orbit { color: var(--blue-2); border-color: rgba(66, 99, 235, .2); background: var(--blue-soft); }
+:root:not(.dark) .hero-kicker,
+:root:not(.dark) .hero-identity p,
+:root:not(.dark) .metric-copy > span { color: var(--muted); }
+:root:not(.dark) .hero-status strong,
+:root:not(.dark) .metric-copy > strong,
+:root:not(.dark) .project-stats strong,
+:root:not(.dark) .disk-card strong,
+:root:not(.dark) .harness-summary strong { color: var(--text); }
+:root:not(.dark) .status-badge { color: #59687b; border-color: #d9e0e8; background: #f7f8fa; }
+:root:not(.dark) .resource-bars > div > i { background: #e8ecf1; }
+:root:not(.dark) .resource-bars em { background: var(--blue); }
+:root:not(.dark) .loading-rows i { background: linear-gradient(90deg, #edf0f4 25%, #f8f9fb 50%, #edf0f4 75%); background-size: 220% 100%; }
+:root:not(.dark) .empty-state > svg { color: #8c99aa; }
+:root:not(.dark) .empty-state strong { color: var(--text-2); }
+
+/* Data-dense surfaces */
+:root:not(.dark) th { color: #69788b; background: #f7f8fa; }
+:root:not(.dark) td { color: #526176; }
+:root:not(.dark) tbody tr:hover { background: #fafbfc; }
+:root:not(.dark) td strong,
+:root:not(.dark) .container-card dd,
+:root:not(.dark) .key-value > strong,
+:root:not(.dark) .capability-list span { color: var(--text-2); }
+:root:not(.dark) td code,
+:root:not(.dark) .port-code,
+:root:not(.dark) .docs-grid code { color: #4059b8; }
+:root:not(.dark) .tag-list span,
+:root:not(.dark) .binding-list span,
+:root:not(.dark) .tag-pill,
+:root:not(.dark) .project-chip { color: #59687b; border-color: #dce2e9; background: #f5f7fa; }
+:root:not(.dark) .project-card footer,
+:root:not(.dark) .container-card footer,
+:root:not(.dark) .docker-card footer { background: #fafbfc; }
+:root:not(.dark) .key-value { background: #fafbfc; }
+:root:not(.dark) .filter-tabs button.active,
+:root:not(.dark) .tab-bar button.active,
+:root:not(.dark) .console-tabs button.active { color: var(--text); background: #e9edf2; }
+
+/* Agent, files, console, and topology */
+:root:not(.dark) .approval-args,
+:root:not(.dark) .message pre,
+:root:not(.dark) .code-editor,
+:root:not(.dark) .diff-panel pre,
+:root:not(.dark) .modal-readiness-results,
+:root:not(.dark) .form-body input[type="text"],
+:root:not(.dark) .project-select-label { background: #f7f8fa; }
+:root:not(.dark) pre,
+:root:not(.dark) .code-editor,
+:root:not(.dark) .log-output { color: #44536a; }
+:root:not(.dark) .message-copy > strong,
+:root:not(.dark) .message p,
+:root:not(.dark) .markdown-body,
+:root:not(.dark) .markdown-body h1,
+:root:not(.dark) .markdown-body h2,
+:root:not(.dark) .markdown-body h3,
+:root:not(.dark) .markdown-body h4 { color: var(--text); }
+:root:not(.dark) .markdown-body blockquote { color: #59687b; }
+:root:not(.dark) .markdown-body code { color: #2949c7; border-color: #dce2e9; background: #f3f5f9; }
+:root:not(.dark) .markdown-body th { color: var(--text-2); background: #f2f4f7; }
+:root:not(.dark) .agent-trace { background: #fafbfc; }
+:root:not(.dark) .agent-trace > header { background: #f3f5f8; }
+:root:not(.dark) .agent-trace > header span,
+:root:not(.dark) .trace-step strong,
+:root:not(.dark) .file-browser footer strong { color: var(--text-2); }
+:root:not(.dark) .trace-step:not(:last-child)::after { background: #d9e0e8; }
+:root:not(.dark) .trace-marker { background: #fff; }
+:root:not(.dark) .trace-step p { color: var(--muted); }
+:root:not(.dark) .agent-composer { background: #fafbfc; }
+:root:not(.dark) .agent-composer textarea { color: var(--text); border-color: #d6dde6; background: #fff; }
+:root:not(.dark) .file-browser nav button:hover { background: #f1f4f7; }
+:root:not(.dark) .topology-toolbar { box-shadow: 0 1px 2px rgba(20, 34, 51, .025); }
+:root:not(.dark) .zoom-controls button:hover { background: #e9edf2; }
+:root:not(.dark) .graph-scroll { background-image: radial-gradient(#d6dde6 .65px, transparent .65px); }
+:root:not(.dark) .graph-edges line { stroke: #c7d0dc; }
+:root:not(.dark) .graph-edges marker path { fill: #aeb9c7; }
+:root:not(.dark) .graph-edges text { fill: #76869a; }
+:root:not(.dark) .graph-node rect { fill: #fff; stroke: #cad3de; }
+:root:not(.dark) .graph-node .node-label { fill: #2e3c50; }
+:root:not(.dark) .graph-node .node-type { fill: #77869a; }
+:root:not(.dark) .graph-node:hover rect,
+:root:not(.dark) .graph-node.related rect { stroke: #8292a7; }
+:root:not(.dark) .graph-node.selected rect { fill: #f2f5ff; }
+:root:not(.dark) .console-panel { background: #fff; }
+:root:not(.dark) .console-event { border-bottom-color: #edf0f4; }
+:root:not(.dark) .console-event:hover { background: #fafbfc; }
+:root:not(.dark) .console-event time,
+:root:not(.dark) .console-event code,
+:root:not(.dark) .console-event small { color: var(--muted); }
+:root:not(.dark) .console-event strong { color: var(--text-2); }
+:root:not(.dark) .log-output { background: #f7f8fa; }
+:root:not(.dark) .preview-panel > header,
+:root:not(.dark) .preview-frame .empty-state { background: #f7f8fa; }
+
+/* Stack workflows and overlays */
+:root:not(.dark) .active-stack-banner { background: #f4faf7; }
+:root:not(.dark) .stack-card { background: #fff; box-shadow: 0 1px 2px rgba(20, 34, 51, .03); }
+:root:not(.dark) .stack-card:hover { border-color: #b8c3d0; background: #fbfcfd; box-shadow: 0 8px 24px rgba(20, 34, 51, .06); transform: translateY(-1px); }
+:root:not(.dark) .stack-card.selected-card { background: #f3f6ff; }
+:root:not(.dark) .stage-connector { background: #d8dfe8; }
+:root:not(.dark) .stage-body,
+:root:not(.dark) .stage-project-pill,
+:root:not(.dark) .gate-card,
+:root:not(.dark) .readiness-access-row { background: #fafbfc; }
+:root:not(.dark) .stage-project-pill { border-color: #dce2e9; }
+:root:not(.dark) .gate-icon { background: #edf1f8; }
+:root:not(.dark) .gate-target { color: var(--text-2); }
+:root:not(.dark) .modal-backdrop,
+:root:not(.dark) .modal-scrim { background: rgba(25, 34, 48, .5); backdrop-filter: blur(3px); }
+:root:not(.dark) .command-palette,
+:root:not(.dark) .modal-card { border-color: #cfd7e1; background: #fff; box-shadow: 0 24px 70px rgba(20, 34, 51, .2); }
+:root:not(.dark) .command-palette header button,
+:root:not(.dark) .command-results > button:hover { background: #eef1f5; }
+:root:not(.dark) .toast { color: var(--text-2); border-color: #d2d9e2; background: #fff; box-shadow: 0 12px 32px rgba(20, 34, 51, .14); }
+
+@media (prefers-contrast: more) {
+  :root:not(.dark) { --line: #aeb8c5; --line-soft: #cfd6df; --muted: #4e5e73; --muted-2: #637287; }
+}

@@ -1,3 +1,5 @@
+@import "./theme-light.css";
+
 :root {
   --bg: #ffffff;
   --bg-elevated: #fafafa;
@@ -19,8 +21,8 @@
   --amber-soft: rgba(245, 158, 11, 0.12);
   --red: #ef4444;
   --red-soft: rgba(239, 68, 68, 0.12);
-  --radius: 0px;
-  --radius-sm: 0px;
+  --radius: 10px;
+  --radius-sm: 7px;
   --sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
@@ -50,7 +52,7 @@
 
 * { box-sizing: border-box; }
 html { background: var(--bg); color: var(--text); font-family: var(--sans); }
-body { min-width: 320px; min-height: 100vh; margin: 0; background: var(--panel); }
+body { min-width: 320px; min-height: 100vh; margin: 0; background: var(--bg); }
 button, input, textarea, select { color: inherit; font: inherit; }
 button { border: 0; cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .48; }
@@ -60,6 +62,9 @@ svg { width: 17px; height: 17px; stroke-width: 1.8; }
 ::-webkit-scrollbar { width: 9px; height: 9px; }
 ::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 8px; background: #273244; background-clip: padding-box; }
 ::-webkit-scrollbar-track { background: transparent; }
+
+:where(button, a, input, textarea, select, summary):focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
 
 .app-shell { display: grid; grid-template-columns: 244px minmax(0, 1fr); min-height: 100vh; }
 .sidebar { position: sticky; top: 0; z-index: 30; width: 244px; height: 100vh; display: flex; flex-direction: column; overflow: hidden; border-right: 1px solid var(--line); background: rgba(10, 14, 21, .96); transition: width .18s ease;  }
@@ -128,6 +133,8 @@ svg { width: 17px; height: 17px; stroke-width: 1.8; }
 .sync-state { margin-right: 5px; color: var(--muted-2); font-size: 8.5px; }
 .live-pill { height: 25px; display: inline-flex; align-items: center; gap: 6px; padding: 0 9px; color: #83d8bb; border: 1px solid rgba(95,214,173,.18); border-radius: 13px; background: rgba(95,214,173,.06); font-size: 8.5px; }
 .live-pill i { width: 5px; height: 5px; border-radius: 50%; background: var(--green); box-shadow: 0 0 7px var(--green); }
+.live-pill.offline { color: var(--red); border-color: rgba(241,125,136,.18); background: var(--red-soft); }
+.live-pill.offline i { background: var(--red); box-shadow: none; }
 .command-button { height: 33px; width: 210px; display: flex; align-items: center; gap: 7px; margin-left: 5px; padding: 0 8px; color: var(--muted); border: 1px solid var(--line); border-radius: 7px; background: #0d131c; text-align: left; }
 .command-button:hover { border-color: #37455b; }
 .command-button svg { width: 13px; }
@@ -135,6 +142,10 @@ svg { width: 17px; height: 17px; stroke-width: 1.8; }
 kbd { padding: 2px 5px; color: #77869a; border: 1px solid #2a3545; border-radius: 4px; background: #121924; font: 8px var(--mono); }
 .icon-button { width: 33px; height: 33px; display: grid; place-items: center; color: var(--muted); border: 1px solid var(--line); border-radius: 7px; background: #0d131c; }
 .icon-button:hover { color: var(--text); border-color: #37455b; }
+.theme-toggle svg { width: 15px; height: 15px; }
+.theme-toggle .icon-sun { display: none; }
+.dark .theme-toggle .icon-sun { display: block; }
+.dark .theme-toggle .icon-moon { display: none; }
 
 .content { width: 100%; max-width: 1560px; margin: 0 auto; padding: 35px 34px 70px; animation: view-in .22s ease-out; }
 @keyframes view-in { from { opacity: .4; transform: translateY(3px); } to { opacity: 1; transform: none; } }
@@ -157,7 +168,7 @@ kbd { padding: 2px 5px; color: #77869a; border: 1px solid #2a3545; border-radius
 .button.danger:hover:not(:disabled) { color: #ffc1c7; border-color: rgba(241,125,136,.42); background: rgba(241,125,136,.17); }
 .button svg { width: 13px; height: 13px; }
 
-.panel { min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); box-shadow: inset 0 1px rgba(255,255,255,.018), 0 10px 35px rgba(0,0,0,.06); }
+.panel { min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); box-shadow: inset 0 1px rgba(255,255,255,.018), 0 10px 35px rgba(0,0,0,.06); transition: border-color .16s ease, box-shadow .16s ease, background .16s ease; }
 .panel-head { min-height: 39px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 15px; }
 .panel-head h2, .panel h2 { margin: 0; color: #dfe5ed; font-size: 12px; font-weight: 600; letter-spacing: -.01em; }
 .panel-head p, .panel > p { margin: 5px 0 0; color: var(--muted); font-size: 9.5px; line-height: 1.5; }
@@ -502,3 +513,28 @@ pre { margin: 0; color: #9eacc0; font: 8.5px/1.65 var(--mono); white-space: pre-
 .project-select-label small { font-size: 8px; color: var(--muted); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { 100% { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+/* A compact control plane still needs to be comfortably scannable. */
+.workspace-switcher strong { font-size: 11px; }
+.sidebar nav section > p { font-size: 8.5px; }
+.sidebar nav button b { font-size: 11px; }
+.breadcrumbs { font-size: 11px; }
+.sync-state, .live-pill { font-size: 9px; }
+.command-button span { font-size: 10px; }
+.page-heading > div:first-child > p:not(.eyebrow) { font-size: 12px; }
+.eyebrow { font-size: 8.5px; }
+.button { font-size: 10px; }
+.panel-head h2, .panel h2, .table-toolbar h2 { font-size: 12.5px; }
+.panel-head p, .panel > p { font-size: 10px; }
+.metric-copy > span { font-size: 9.5px; }
+.metric-copy > p { font-size: 9px; }
+.status-badge { font-size: 8.5px; }
+table { font-size: 10px; }
+th { font-size: 8px; }
+td strong { font-size: 10px; }
+td small { font-size: 8.5px; }
+.empty-state p { font-size: 9.5px; }
