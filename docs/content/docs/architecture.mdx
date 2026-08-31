@@ -76,6 +76,13 @@ Examples of verification include:
 - checking the new host port has the expected owner;
 - verifying stack readiness gates (`tcp_port`, `http_get`, `docker_health`) and checking measured endpoint latency.
 
+Network readiness gates pass through a destination policy before any socket is
+opened. Connections use the validated resolved IP directly to prevent DNS
+rebinding. Loopback and registered Compose services are automatic; non-local
+targets require a persisted, revocable approval scoped to protocol, host, port,
+and resolved addresses. Redirect hops are independently checked, while link-local
+and metadata destinations are unconditionally denied.
+
 
 ## Security Boundaries
 

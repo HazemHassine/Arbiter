@@ -36,6 +36,9 @@ Instead of booting all containers concurrently and suffering race conditions (e.
   - `http_get`: HTTP endpoint probe verifying expected HTTP status codes (e.g. `200 OK`) and latency.
   - `docker_health`: Live container status inspection (`running`, `healthy`).
 - **Readiness Wait Loop**: Downstream boot stages wait until upstream readiness gates pass or timeout.
+- **Preflight Before Mutation**: A stack switch stops before changing files or services when any readiness destination is blocked or still needs access approval.
+- **Destination Safety Policy**: Loopback and registered Compose service targets run automatically. Other destinations return `approval_required` until an operator approves the exact protocol, hostname, port, and resolved IP set.
+- **Hard Blocks**: Link-local/cloud metadata, multicast, unspecified, and reserved destinations cannot be approved. Redirects are limited and every hop is validated before connecting.
 
 ---
 
@@ -69,6 +72,13 @@ arbiter stack boot-order "Billing Microservices"
 
 # Probe all readiness gates for a stack preset in real time
 arbiter stack readiness "Billing Microservices"
+
+# Create approval requests for non-local readiness destinations
+arbiter stack readiness "Billing Microservices" --request-access
+
+# Review or revoke persisted readiness access
+arbiter stack readiness-access
+arbiter stack readiness-access --revoke AUTHORIZATION_ID
 
 # 1-Click switch to a target stack preset
 arbiter stack switch "AI Pipeline + Vector DB"
@@ -104,6 +114,9 @@ The Stacks subsystem exposes standard REST endpoints under `/api/v1/stacks`:
 | `DELETE` | `/api/v1/stacks/{id}` | Delete a stack preset |
 | `GET` | `/api/v1/stacks/{id}/boot-order` | Compute topological boot stages & gates |
 | `GET` | `/api/v1/stacks/{id}/readiness` | Check live readiness gates |
+| `POST` | `/api/v1/stacks/{id}/readiness/authorizations` | Request scoped approvals for non-local gates |
+| `GET` | `/api/v1/readiness/authorizations` | List persisted readiness grants |
+| `DELETE` | `/api/v1/readiness/authorizations/{id}` | Revoke a readiness grant |
 | `POST` | `/api/v1/stacks/{id}/switch` | Propose 1-click context switch action |
 | `POST` | `/api/v1/stacks/{id}/stop` | Propose stop/hibernate stack action |
 

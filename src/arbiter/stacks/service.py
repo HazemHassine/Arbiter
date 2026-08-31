@@ -1,9 +1,9 @@
 import contextlib
+import http.client
 import shutil
 import socket
 import time
-import urllib.error
-import urllib.request
+import urllib.parse
 from collections import defaultdict, deque
 from datetime import UTC, datetime
 from typing import Any
@@ -15,11 +15,14 @@ from arbiter.config import Settings, get_settings
 from arbiter.docker.service import DockerService
 from arbiter.files.service import FileService
 from arbiter.models import (
+    ActionSpec,
     BootOrderStage,
     PortReconciliationChange,
     ReadinessGate,
+    ReadinessPolicyStatus,
     ReadinessProbeResult,
     ReadinessProbeType,
+    Risk,
     Stack,
     StackBootPlan,
     StackProjectMember,
@@ -30,6 +33,8 @@ from arbiter.persistence.database import Database
 from arbiter.persistence.repositories import StackRepository
 from arbiter.ports.service import PortService
 from arbiter.projects.service import ProjectService
+from arbiter.readiness import ReadinessPolicyService
+from arbiter.safety.approvals import ApprovalService
 
 
 class StackService:
@@ -51,6 +56,7 @@ class StackService:
         self.editor = ComposeEditor()
         self.files = files
         self.settings = settings or get_settings()
+        self.readiness_policy = ReadinessPolicyService(database, projects)
 
     def list_stacks(self) -> list[Stack]:
         with self.database.sessions() as session:
@@ -373,6 +379,18 @@ class StackService:
         """Probe a single readiness gate (TCP socket probe, HTTP GET endpoint, or Docker health check)."""
         start = time.perf_counter()
         probe_type = gate.probe_type
+        decision = self.readiness_policy.evaluate(gate)
+        if decision.status != ReadinessPolicyStatus.ALLOWED:
+            return ReadinessProbeResult(
+                service=gate.service,
+                probe_type=probe_type,
+                target=self._gate_target(gate),
+                healthy=False,
+                message=decision.reason,
+                policy_status=decision.status,
+                policy_reason=decision.reason,
+                resolved_addresses=list(decision.resolved_addresses),
+            )
 
         if probe_type == ReadinessProbeType.TCP_PORT:
             port = gate.port
@@ -384,11 +402,11 @@ class StackService:
                     healthy=False,
                     message="No port specified for TCP probe",
                 )
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(min(gate.timeout_seconds, 2.0))
             try:
-                sock.connect((gate.host, port))
-                sock.close()
+                connection = socket.create_connection(
+                    (decision.resolved_addresses[0], port), timeout=min(gate.timeout_seconds, 2.0)
+                )
+                connection.close()
                 latency = (time.perf_counter() - start) * 1000.0
                 return ReadinessProbeResult(
                     service=gate.service,
@@ -397,6 +415,8 @@ class StackService:
                     healthy=True,
                     latency_ms=round(latency, 2),
                     message=f"TCP port {port} is open and accepting connections",
+                    policy_reason=decision.reason,
+                    resolved_addresses=list(decision.resolved_addresses),
                 )
             except Exception as exc:
                 latency = (time.perf_counter() - start) * 1000.0
@@ -407,50 +427,37 @@ class StackService:
                     healthy=False,
                     latency_ms=round(latency, 2),
                     message=f"TCP port {port} unavailable: {exc}",
+                    policy_reason=decision.reason,
+                    resolved_addresses=list(decision.resolved_addresses),
                 )
 
         elif probe_type == ReadinessProbeType.HTTP_GET:
-            port = gate.port or 80
-            path = gate.path or "/"
-            if not path.startswith("/"):
-                path = f"/{path}"
-            url = f"http://{gate.host}:{port}{path}"
-            req = urllib.request.Request(url, headers={"User-Agent": "Arbiter-Readiness-Probe/1.0"})
             try:
-                with urllib.request.urlopen(req, timeout=min(gate.timeout_seconds, 3.0)) as resp:
-                    latency = (time.perf_counter() - start) * 1000.0
-                    code = resp.getcode()
-                    healthy = (200 <= code < 400) if gate.expected_status == 200 else (code == gate.expected_status)
-                    return ReadinessProbeResult(
-                        service=gate.service,
-                        probe_type=probe_type,
-                        target=url,
-                        healthy=healthy,
-                        status_code=code,
-                        latency_ms=round(latency, 2),
-                        message=f"HTTP {code} OK" if healthy else f"Unexpected HTTP status {code}",
-                    )
-            except urllib.error.HTTPError as exc:
+                code, final_url, final_decision = self._http_get(gate, decision)
                 latency = (time.perf_counter() - start) * 1000.0
-                healthy = exc.code == gate.expected_status
+                healthy = (200 <= code < 400) if gate.expected_status == 200 else code == gate.expected_status
                 return ReadinessProbeResult(
                     service=gate.service,
                     probe_type=probe_type,
-                    target=url,
+                    target=final_url,
                     healthy=healthy,
-                    status_code=exc.code,
+                    status_code=code,
                     latency_ms=round(latency, 2),
-                    message=f"HTTP status {exc.code}" if healthy else f"HTTP error {exc.code}",
+                    message=f"HTTP {code} OK" if healthy else f"Unexpected HTTP status {code}",
+                    policy_reason=final_decision.reason,
+                    resolved_addresses=list(final_decision.resolved_addresses),
                 )
             except Exception as exc:
                 latency = (time.perf_counter() - start) * 1000.0
                 return ReadinessProbeResult(
                     service=gate.service,
                     probe_type=probe_type,
-                    target=url,
+                    target=self._gate_target(gate),
                     healthy=False,
                     latency_ms=round(latency, 2),
                     message=f"HTTP connection failed: {exc}",
+                    policy_reason=decision.reason,
+                    resolved_addresses=list(decision.resolved_addresses),
                 )
 
         elif probe_type == ReadinessProbeType.DOCKER_HEALTH:
@@ -495,6 +502,107 @@ class StackService:
             message=f"Unsupported probe type: {probe_type}",
         )
 
+    def request_readiness_authorizations(self, identifier: str) -> list[dict[str, object]]:
+        """Create deduplicated approval requests for non-local gates in one stack."""
+        stack = self.get_stack(identifier)
+        plan = self.compute_boot_plan(stack)
+        approvals = ApprovalService(self.database)
+        pending = [
+            item for item in approvals.list() if item.status == "pending" and item.action == "readiness.authorize"
+        ]
+        requested: list[dict[str, object]] = []
+        seen: set[str] = set()
+        for stage in plan.stages:
+            for gate in stage.readiness_gates:
+                decision = self.readiness_policy.evaluate(gate)
+                if decision.status != ReadinessPolicyStatus.APPROVAL_REQUIRED or decision.target_key in seen:
+                    continue
+                seen.add(decision.target_key)
+                existing = next(
+                    (
+                        item
+                        for item in pending
+                        if item.arguments.get("target_key") == decision.target_key
+                        and sorted(item.arguments.get("resolved_addresses", [])) == sorted(decision.resolved_addresses)
+                    ),
+                    None,
+                )
+                if existing:
+                    requested.append({"status": "approval_required", "approval": existing.model_dump(mode="json")})
+                    continue
+                spec = ActionSpec(
+                    action="readiness.authorize",
+                    risk=Risk.MEDIUM_RISK,
+                    summary=f"Allow readiness probe to {decision.protocol}://{decision.host}:{decision.port}",
+                    arguments={
+                        "stack_id": stack.id,
+                        "target_key": decision.target_key,
+                        "gate": gate.model_dump(mode="json"),
+                        "resolved_addresses": list(decision.resolved_addresses),
+                    },
+                )
+                created = approvals.create(spec)
+                requested.append({"status": "approval_required", "approval": created.model_dump(mode="json")})
+        return requested
+
+    @staticmethod
+    def _gate_target(gate: ReadinessGate) -> str:
+        if gate.probe_type == ReadinessProbeType.DOCKER_HEALTH:
+            return gate.service or "docker_container"
+        scheme = "http://" if gate.probe_type == ReadinessProbeType.HTTP_GET else ""
+        port = gate.port or (80 if gate.probe_type == ReadinessProbeType.HTTP_GET else "[unspecified]")
+        normalized_host = gate.host.strip("[]")
+        display_host = f"[{normalized_host}]" if ":" in normalized_host else normalized_host
+        return f"{scheme}{display_host}:{port}{gate.path or '/' if scheme else ''}"
+
+    def _http_get(self, gate, initial_decision):
+        url = self._gate_target(gate)
+        decision = initial_decision
+        for redirect_count in range(4):
+            parsed = urllib.parse.urlsplit(url)
+            if parsed.scheme != "http" or parsed.username or parsed.password or not parsed.hostname:
+                raise ValueError("Readiness redirects must use a plain HTTP URL without credentials")
+            port = parsed.port or 80
+            redirected_gate = ReadinessGate.model_validate(
+                {
+                    **gate.model_dump(mode="python"),
+                    "host": parsed.hostname,
+                    "port": port,
+                    "path": urllib.parse.urlunsplit(("", "", parsed.path or "/", parsed.query, "")),
+                }
+            )
+            decision = self.readiness_policy.evaluate(redirected_gate)
+            if decision.status != ReadinessPolicyStatus.ALLOWED:
+                raise PermissionError(f"Redirect destination denied: {decision.reason}")
+            last_error: Exception | None = None
+            for address in decision.resolved_addresses:
+                connection = http.client.HTTPConnection(address, port, timeout=min(gate.timeout_seconds, 3.0))
+                header_host = f"[{parsed.hostname}]" if ":" in parsed.hostname else parsed.hostname
+                host_header = header_host if port == 80 else f"{header_host}:{port}"
+                try:
+                    connection.request(
+                        "GET",
+                        urllib.parse.urlunsplit(("", "", parsed.path or "/", parsed.query, "")),
+                        headers={"Host": host_header, "User-Agent": "Arbiter-Readiness-Probe/1.0"},
+                    )
+                    response = connection.getresponse()
+                    status = response.status
+                    location = response.getheader("Location")
+                    response.close()
+                    if 300 <= status < 400 and location:
+                        if redirect_count >= 3:
+                            raise ValueError("Readiness endpoint exceeded the redirect limit")
+                        url = urllib.parse.urljoin(url, location)
+                        break
+                    return status, url, decision
+                except (OSError, http.client.HTTPException) as exc:
+                    last_error = exc
+                finally:
+                    connection.close()
+            else:
+                raise last_error or ConnectionError("Readiness HTTP connection failed")
+        raise ValueError("Readiness endpoint exceeded the redirect limit")
+
     def check_stack_readiness(self, identifier: str) -> list[ReadinessProbeResult]:
         """Check all readiness gates for all projects in the given stack preset."""
         stack = self.get_stack(identifier)
@@ -504,6 +612,29 @@ class StackService:
             for gate in stage.readiness_gates:
                 results.append(self.check_readiness_gate(gate))
         return results
+
+    def readiness_policy_failures(self, identifier: str) -> list[ReadinessProbeResult]:
+        """Return denied gates without opening sockets or running Docker checks."""
+        stack = self.get_stack(identifier)
+        failures: list[ReadinessProbeResult] = []
+        for stage in self.compute_boot_plan(stack).stages:
+            for gate in stage.readiness_gates:
+                decision = self.readiness_policy.evaluate(gate)
+                if decision.status == ReadinessPolicyStatus.ALLOWED:
+                    continue
+                failures.append(
+                    ReadinessProbeResult(
+                        service=gate.service,
+                        probe_type=gate.probe_type,
+                        target=self._gate_target(gate),
+                        healthy=False,
+                        message=decision.reason,
+                        policy_status=decision.status,
+                        policy_reason=decision.reason,
+                        resolved_addresses=list(decision.resolved_addresses),
+                    )
+                )
+        return failures
 
     def wait_for_readiness_gates(
         self, gates: list[ReadinessGate], max_wait_seconds: float = 10.0, poll_interval: float = 0.3
@@ -541,6 +672,17 @@ class StackService:
         target_stack = self.get_stack(target_identifier)
         previous_stack = self.get_active_stack()
         previous_stack_id = previous_stack.id if previous_stack else None
+
+        policy_failures = self.readiness_policy_failures(target_stack.id) if wait_for_readiness else []
+        if policy_failures:
+            return StackSwitchResult(
+                previous_stack_id=previous_stack_id,
+                target_stack_id=target_stack.id,
+                readiness_results=policy_failures,
+                status="blocked",
+                verified=False,
+                error="Readiness destination access must be approved before switching stacks",
+            )
 
         stopped_projects: list[str] = []
         started_projects: list[str] = []

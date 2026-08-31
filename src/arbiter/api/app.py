@@ -343,12 +343,33 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
         except LookupError as exc:
             raise HTTPException(404, str(exc)) from exc
 
+    @router.post("/stacks/{identifier}/readiness/authorizations")
+    def request_stack_readiness_authorizations(identifier: str, services: Dep) -> list[dict[str, object]]:
+        return services.stacks.request_readiness_authorizations(identifier)
+
+    @router.get("/readiness/authorizations")
+    def readiness_authorizations(services: Dep) -> list[dict[str, Any]]:
+        return [item.model_dump(mode="json") for item in services.stacks.readiness_policy.list()]
+
+    @router.delete("/readiness/authorizations/{authorization_id}")
+    def revoke_readiness_authorization(authorization_id: str, services: Dep) -> dict[str, bool]:
+        if not services.stacks.readiness_policy.revoke(authorization_id):
+            raise HTTPException(404, f"Readiness authorization not found: {authorization_id}")
+        return {"revoked": True}
+
     @router.post("/stacks/{identifier}/switch")
     def switch_stack(identifier: str, body: SwitchStackRequest, services: Dep) -> dict[str, Any]:
         try:
             stack = services.stacks.get_stack(identifier)
         except LookupError as exc:
             raise HTTPException(404, str(exc)) from exc
+        if body.wait_for_readiness:
+            policy_failures = services.stacks.readiness_policy_failures(stack.id)
+            if policy_failures:
+                return {
+                    "status": "readiness_access_required",
+                    "readiness": [item.model_dump(mode="json") for item in policy_failures],
+                }
         spec = ActionSpec(
             action="stack.switch",
             risk=Risk.MEDIUM_RISK,

@@ -19,6 +19,7 @@ from arbiter.persistence.tables import (
     ManagedFileBackupRow,
     PortReservationRow,
     ProjectRow,
+    ReadinessAuthorizationRow,
 )
 from arbiter.safety.policies import ACTION_RISKS, needs_approval
 
@@ -62,6 +63,7 @@ class AdminService:
             "actions": ActionRow,
             "agent_requests": AgentRequestRow,
             "managed_file_backups": ManagedFileBackupRow,
+            "readiness_authorizations": ReadinessAuthorizationRow,
         }
         with self.services.database.sessions() as session:
             counts = {

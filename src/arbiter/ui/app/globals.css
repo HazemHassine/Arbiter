@@ -463,6 +463,11 @@ pre { margin: 0; color: #9eacc0; font: 8.5px/1.65 var(--mono); white-space: pre-
 .gate-target { margin: 2px 0 0; color: #a1b0c4; font-size: 9px; }
 .gate-meta { color: var(--muted); font-size: 8px; display: block; margin-top: 2px; }
 .no-gates-note { color: var(--muted); font-size: 9px; font-style: italic; }
+.readiness-access-panel { margin-top: 12px; }
+.readiness-access-list { display: grid; gap: 7px; margin-top: 10px; }
+.readiness-access-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 6px; background: #0a0f17; }
+.readiness-access-row strong { display: block; font-size: 10px; }
+.readiness-access-row small { display: block; margin-top: 3px; color: var(--muted); font: 8px var(--mono); }
 
 .modal-scrim { position: fixed; inset: 0; z-index: 120; background: rgba(0,0,0,.7); display: flex; align-items: center; justify-content: center; padding: 20px; }
 .modal-card { width: min(580px, 100%); background: #0e1520; border: 1px solid #28374d; border-radius: 8px; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,.6); max-height: 85vh; display: flex; flex-direction: column; }

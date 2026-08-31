@@ -15,12 +15,14 @@ from arbiter.tui.views import (
     TAB_NAMES,
     TAB_PORTS,
     TAB_PROJECTS,
+    TAB_READINESS,
     TUIData,
     TUIState,
     format_approval_row,
     format_container_row,
     format_port_row,
     format_project_row,
+    format_readiness_authorization_row,
     get_item_details,
 )
 
@@ -61,6 +63,11 @@ class ArbiterTUI:
         except Exception:
             self.data.projects = []
 
+        try:
+            self.data.readiness_authorizations = self.services.stacks.readiness_policy.list()
+        except Exception:
+            self.data.readiness_authorizations = []
+
         self.last_refresh_time = time.time()
 
     def get_current_items(self) -> list[Any]:
@@ -91,25 +98,25 @@ class ArbiterTUI:
         if tab == TAB_APPROVALS:
             items = self.data.approvals
             if query:
-                return [
-                    a
-                    for a in items
-                    if query in f"{a.id} {a.action} {a.risk.value} {a.status} {a.summary}".lower()
-                ]
+                return [a for a in items if query in f"{a.id} {a.action} {a.risk.value} {a.status} {a.summary}".lower()]
             return items
 
         if tab == TAB_PROJECTS:
             items = self.data.projects
             if query:
                 return [
-                    p
-                    for p in items
-                    if query in f"{p.id} {p.name} {p.path} {' '.join(s for s in p.services)}".lower()
+                    p for p in items if query in f"{p.id} {p.name} {p.path} {' '.join(s for s in p.services)}".lower()
                 ]
             return items
 
         if tab == TAB_LOGS:
             return self.state.log_lines
+
+        if tab == TAB_READINESS:
+            items = self.data.readiness_authorizations
+            if query:
+                return [item for item in items if query in item.target_key.lower()]
+            return items
 
         return []
 
@@ -152,6 +159,17 @@ class ArbiterTUI:
             self.load_data()
         except Exception as exc:
             self.state.status_message = f"Prepare failed: {exc}"
+            self.state.status_is_error = True
+
+    def revoke_readiness_authorization(self, authorization_id: str) -> None:
+        try:
+            if not self.services.stacks.readiness_policy.revoke(authorization_id):
+                raise LookupError("Readiness authorization no longer exists")
+            self.state.status_message = "Readiness authorization revoked"
+            self.state.status_is_error = False
+            self.load_data()
+        except Exception as exc:
+            self.state.status_message = f"Revocation failed: {exc}"
             self.state.status_is_error = True
 
     def run(self, stdscr) -> None:
@@ -225,7 +243,7 @@ class ArbiterTUI:
         stats = f"[⚡ {pending_count} Pending | ⚠️ {conflict_count} Conflicts | ● {container_count} Containers]"
 
         stdscr.attron(curses.color_pair(1) | curses.A_BOLD)
-        stdscr.addstr(0, 1, title[:max_x - 2])
+        stdscr.addstr(0, 1, title[: max_x - 2])
         stdscr.attroff(curses.color_pair(1) | curses.A_BOLD)
 
         if len(title) + len(stats) + 4 < max_x:
@@ -267,16 +285,19 @@ class ArbiterTUI:
         header_y = 3
         if self.state.active_tab == TAB_PORTS:
             header_text = f"{'PORT':<12} {'OWNER':<14} {'PID':<8} {'STATUS':<12}"
-            stdscr.addstr(header_y, 1, header_text[:left_width - 1], curses.A_BOLD)
+            stdscr.addstr(header_y, 1, header_text[: left_width - 1], curses.A_BOLD)
         elif self.state.active_tab == TAB_CONTAINERS:
             header_text = f"{'NAME':<16} {'STATE':<10} {'IMAGE':<16} {'PORTS':<12}"
-            stdscr.addstr(header_y, 1, header_text[:left_width - 1], curses.A_BOLD)
+            stdscr.addstr(header_y, 1, header_text[: left_width - 1], curses.A_BOLD)
         elif self.state.active_tab == TAB_APPROVALS:
             header_text = f"{'ID':<10} {'ACTION':<20} {'RISK':<8} {'STATUS':<10}"
-            stdscr.addstr(header_y, 1, header_text[:left_width - 1], curses.A_BOLD)
+            stdscr.addstr(header_y, 1, header_text[: left_width - 1], curses.A_BOLD)
         elif self.state.active_tab == TAB_PROJECTS:
             header_text = f"{'PROJECT':<16} {'SERVICES':<12} {'PORTS':<10}"
-            stdscr.addstr(header_y, 1, header_text[:left_width - 1], curses.A_BOLD)
+            stdscr.addstr(header_y, 1, header_text[: left_width - 1], curses.A_BOLD)
+        elif self.state.active_tab == TAB_READINESS:
+            header_text = f"{'ID':<10} {'PROTO':<8} {'AUTHORIZED TARGET':<30}"
+            stdscr.addstr(header_y, 1, header_text[: left_width - 1], curses.A_BOLD)
 
         # Draw Vertical Split Border
         for y in range(3, 3 + content_height + 1):
@@ -302,29 +323,31 @@ class ArbiterTUI:
 
                 if self.state.active_tab == TAB_PORTS:
                     has_conf = any(
-                        c.get("port") == item.port and c.get("protocol") == item.protocol
-                        for c in self.data.conflicts
+                        c.get("port") == item.port and c.get("protocol") == item.protocol for c in self.data.conflicts
                     )
                     p_proto, owner, pid, _, status = format_port_row(item, has_conf)
-                    line_str = f"{p_proto:<12} {owner[:13]:<14} {pid:<8} {status:<12}"[:left_width - 2]
+                    line_str = f"{p_proto:<12} {owner[:13]:<14} {pid:<8} {status:<12}"[: left_width - 2]
                 elif self.state.active_tab == TAB_CONTAINERS:
                     name, state, img, _, ports = format_container_row(item)
-                    line_str = f"{name[:15]:<16} {state[:9]:<10} {img[:15]:<16} {ports[:11]:<12}"[:left_width - 2]
+                    line_str = f"{name[:15]:<16} {state[:9]:<10} {img[:15]:<16} {ports[:11]:<12}"[: left_width - 2]
                 elif self.state.active_tab == TAB_APPROVALS:
                     aid, act, risk, st, _ = format_approval_row(item)
-                    line_str = f"{aid:<10} {act[:19]:<20} {risk:<8} {st:<10}"[:left_width - 2]
+                    line_str = f"{aid:<10} {act[:19]:<20} {risk:<8} {st:<10}"[: left_width - 2]
                 elif self.state.active_tab == TAB_PROJECTS:
                     pname, svcs, ports, _ = format_project_row(item)
-                    line_str = f"{pname[:15]:<16} {svcs:<12} {ports:<10}"[:left_width - 2]
+                    line_str = f"{pname[:15]:<16} {svcs:<12} {ports:<10}"[: left_width - 2]
+                elif self.state.active_tab == TAB_READINESS:
+                    aid, protocol, target, _ = format_readiness_authorization_row(item)
+                    line_str = f"{aid:<10} {protocol:<8} {target[:29]:<30}"[: left_width - 2]
                 else:
-                    line_str = str(item)[:left_width - 2]
+                    line_str = str(item)[: left_width - 2]
 
                 if is_selected:
                     stdscr.attron(curses.color_pair(5) | curses.A_BOLD)
-                    stdscr.addstr(row_y, 1, f"❯ {line_str}"[:left_width - 1].ljust(left_width - 1))
+                    stdscr.addstr(row_y, 1, f"❯ {line_str}"[: left_width - 1].ljust(left_width - 1))
                     stdscr.attroff(curses.color_pair(5) | curses.A_BOLD)
                 else:
-                    stdscr.addstr(row_y, 1, f"  {line_str}"[:left_width - 1])
+                    stdscr.addstr(row_y, 1, f"  {line_str}"[: left_width - 1])
 
         # Draw Right Inspector Pane
         inspector_x = left_width + 2
@@ -334,7 +357,7 @@ class ArbiterTUI:
         details_text = get_item_details(self.data, self.state, selected_item)
 
         detail_lines = details_text.split("\n")
-        for idx, d_line in enumerate(detail_lines[:content_height - 1]):
+        for idx, d_line in enumerate(detail_lines[: content_height - 1]):
             row_y = start_row + idx
             if row_y >= max_y - 3:
                 break
@@ -342,7 +365,7 @@ class ArbiterTUI:
 
     def _draw_logs_view(self, stdscr, max_y: int, max_x: int) -> None:
         title = f"LOGS: {self.state.log_container_name or 'None'} (Scroll: j/k, Top/Bottom: g/G, Follow: f)"
-        stdscr.addstr(3, 1, title[:max_x - 2], curses.A_BOLD | curses.color_pair(1))
+        stdscr.addstr(3, 1, title[: max_x - 2], curses.A_BOLD | curses.color_pair(1))
 
         content_height = max_y - 7
         lines = self.state.log_lines
@@ -352,14 +375,14 @@ class ArbiterTUI:
             stdscr.addstr(5, 2, "No logs available.", curses.color_pair(7))
             return
 
-        visible_lines = lines[offset:offset + content_height]
+        visible_lines = lines[offset : offset + content_height]
         for i, line in enumerate(visible_lines):
             row_y = 4 + i
             if row_y >= max_y - 3:
                 break
             line_no = f"{offset + i + 1:4d} │ "
             stdscr.addstr(row_y, 1, line_no, curses.color_pair(3))
-            stdscr.addstr(row_y, 1 + len(line_no), line[:max_x - len(line_no) - 3])
+            stdscr.addstr(row_y, 1 + len(line_no), line[: max_x - len(line_no) - 3])
 
     def _draw_footer(self, stdscr, max_y: int, max_x: int) -> None:
         # Divider line
@@ -369,17 +392,17 @@ class ArbiterTUI:
         if self.state.is_filtering:
             filter_prompt = f"🔍 Filter: {self.state.current_filter_query}_ (Enter to apply, Esc to cancel)"
             stdscr.attron(curses.color_pair(3) | curses.A_BOLD)
-            stdscr.addstr(max_y - 2, 1, filter_prompt[:max_x - 2])
+            stdscr.addstr(max_y - 2, 1, filter_prompt[: max_x - 2])
             stdscr.attroff(curses.color_pair(3) | curses.A_BOLD)
         else:
             status_color = curses.color_pair(4 if self.state.status_is_error else 2)
             stdscr.attron(status_color)
-            stdscr.addstr(max_y - 2, 1, f"Status: {self.state.status_message}"[:max_x - 2])
+            stdscr.addstr(max_y - 2, 1, f"Status: {self.state.status_message}"[: max_x - 2])
             stdscr.attroff(status_color)
 
         # Keymap hint bar
-        hints = "[1-5/Tab] Tabs [j/k] Move [Enter] Inspect [a] Approve [l] Logs [p] Prep [r] Refresh [/] Find [q] Quit"
-        stdscr.addstr(max_y - 1, 1, hints[:max_x - 2], curses.A_DIM)
+        hints = "[1-6/Tab] Tabs [j/k] Move [a] Approve [x] Revoke access [l] Logs [p] Prep [r] Refresh [q] Quit"
+        stdscr.addstr(max_y - 1, 1, hints[: max_x - 2], curses.A_DIM)
 
     def _draw_help_modal(self, stdscr, max_y: int, max_x: int) -> None:
         box_w = min(64, max_x - 4)
@@ -396,10 +419,10 @@ class ArbiterTUI:
 
         shortcuts = [
             ("j / k, ↓ / ↑", "Navigate items up and down"),
-            ("1 - 5, Tab", "Switch between primary tabs"),
+            ("1 - 6, Tab", "Switch between primary tabs"),
             ("Enter", "Inspect details / Drill down"),
             ("a", "Approve & execute selected action"),
-            ("d / x", "Reject selected approval"),
+            ("x", "Revoke selected readiness authorization"),
             ("l", "Jump to container live logs"),
             ("p", "Prepare selected project with Agent"),
             ("r", "Force data refresh"),
@@ -413,7 +436,7 @@ class ArbiterTUI:
             row_y = start_y + 3 + i
             if row_y >= start_y + box_h - 1:
                 break
-            stdscr.addstr(row_y, start_x + 2, f"{key_label:<14} : {desc}"[:box_w - 4], curses.color_pair(5))
+            stdscr.addstr(row_y, start_x + 2, f"{key_label:<14} : {desc}"[: box_w - 4], curses.color_pair(5))
 
     def _draw_confirm_modal(self, stdscr, max_y: int, max_x: int) -> None:
         box_w = min(56, max_x - 4)
@@ -431,9 +454,9 @@ class ArbiterTUI:
         prompt_2 = f"Target ID: {target_id[:20]}"
         prompt_3 = "Press [y] to execute, [n] to cancel"
 
-        stdscr.addstr(start_y + 1, start_x + 2, prompt_1[:box_w - 4], curses.A_BOLD | curses.color_pair(6))
-        stdscr.addstr(start_y + 2, start_x + 2, prompt_2[:box_w - 4], curses.color_pair(6))
-        stdscr.addstr(start_y + 4, start_x + 2, prompt_3[:box_w - 4], curses.A_BOLD | curses.color_pair(6))
+        stdscr.addstr(start_y + 1, start_x + 2, prompt_1[: box_w - 4], curses.A_BOLD | curses.color_pair(6))
+        stdscr.addstr(start_y + 2, start_x + 2, prompt_2[: box_w - 4], curses.color_pair(6))
+        stdscr.addstr(start_y + 4, start_x + 2, prompt_3[: box_w - 4], curses.A_BOLD | curses.color_pair(6))
 
     def _handle_input(self, key: int) -> None:
         # If in filter mode, capture text input
@@ -461,6 +484,8 @@ class ArbiterTUI:
                     self.execute_approval(target_id)
                 elif act_type == "prepare" and target_id:
                     self.prepare_selected_project(target_id)
+                elif act_type == "revoke_readiness" and target_id:
+                    self.revoke_readiness_authorization(target_id)
             elif key in (ord("n"), ord("N"), 27):
                 self.state.confirm_action = None
                 self.state.status_message = "Action cancelled"
@@ -478,9 +503,7 @@ class ArbiterTUI:
         # Navigation
         if key in (ord("j"), curses.KEY_DOWN):
             if self.state.active_tab == TAB_LOGS:
-                self.state.log_scroll_offset = min(
-                    len(self.state.log_lines) - 1, self.state.log_scroll_offset + 1
-                )
+                self.state.log_scroll_offset = min(len(self.state.log_lines) - 1, self.state.log_scroll_offset + 1)
             else:
                 self.state.set_current_selected_index(min(len(items) - 1, curr_idx + 1))
         elif key in (ord("k"), curses.KEY_UP):
@@ -504,7 +527,7 @@ class ArbiterTUI:
             self.state.active_tab = (self.state.active_tab + 1) % len(TAB_NAMES)
         elif key in (ord("h"), curses.KEY_LEFT) and self.state.active_tab != TAB_LOGS:  # Left
             self.state.active_tab = (self.state.active_tab - 1) % len(TAB_NAMES)
-        elif key in (ord("1"), ord("2"), ord("3"), ord("4"), ord("5")):
+        elif key in (ord("1"), ord("2"), ord("3"), ord("4"), ord("5"), ord("6")):
             self.state.active_tab = int(chr(key)) - 1
 
         # Quick Actions
@@ -564,6 +587,13 @@ class ArbiterTUI:
             self.state.confirm_action = {
                 "type": "prepare",
                 "action": f"arbiter prepare {item.name}",
+                "id": item.id,
+            }
+        elif key == ord("x") and self.state.active_tab == TAB_READINESS and items and 0 <= curr_idx < len(items):
+            item = items[curr_idx]
+            self.state.confirm_action = {
+                "type": "revoke_readiness",
+                "action": f"revoke readiness access to {item.host}:{item.port}",
                 "id": item.id,
             }
 

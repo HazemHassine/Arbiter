@@ -86,3 +86,15 @@ class StackRow(Base):
     status: Mapped[str] = mapped_column(String(32), default="inactive")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ReadinessAuthorizationRow(Base):
+    __tablename__ = "readiness_authorizations"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    target_key: Mapped[str] = mapped_column(String(512), unique=True, index=True)
+    protocol: Mapped[str] = mapped_column(String(16))
+    host: Mapped[str] = mapped_column(String(255))
+    port: Mapped[int] = mapped_column(Integer)
+    resolved_addresses: Mapped[list] = mapped_column(JSON, default=list)
+    approval_id: Mapped[str] = mapped_column(String(36), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
