@@ -175,8 +175,9 @@ kbd { padding: 2px 5px; color: #77869a; border: 1px solid #2a3545; border-radius
 .text-button { display: inline-flex; align-items: center; gap: 5px; padding: 4px 0; color: #91a7e7; background: none; font-size: 9px; }
 .text-button:hover { color: #c0ccf4; }
 .text-button svg { width: 12px; }
-.status-badge { min-height: 22px; display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; color: #8f9db0; border: 1px solid #293548; border-radius: 12px; background: rgba(255,255,255,.025); font: 500 8px var(--mono); text-transform: capitalize; white-space: nowrap; }
-.status-badge i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.status-badge { width: max-content; max-width: 180px; min-height: 22px; display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; overflow: hidden; padding: 0 8px; color: #8f9db0; border: 1px solid #293548; border-radius: 12px; background: rgba(255,255,255,.025); font: 500 8px var(--mono); text-overflow: ellipsis; text-transform: capitalize; white-space: nowrap; }
+.status-badge i { width: 5px; height: 5px; flex: 0 0 5px; border-radius: 50%; background: currentColor; }
+.status-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .status-badge.good { color: var(--green); border-color: rgba(95,214,173,.19); background: var(--green-soft); }
 .status-badge.warn { color: var(--amber); border-color: rgba(242,186,102,.2); background: var(--amber-soft); }
 .status-badge.bad { color: var(--red); border-color: rgba(241,125,136,.2); background: var(--red-soft); }
@@ -320,7 +321,7 @@ pre { margin: 0; color: #9eacc0; font: 8.5px/1.65 var(--mono); white-space: pre-
 .error-text { color: var(--red); }
 
 .runtime-card { padding: 0; overflow: hidden; }
-.runtime-card > header > span { width: 38px; height: 38px; display: grid; place-items: center; color: var(--blue); border-radius: 9px; background: var(--blue-soft); }
+.runtime-card > header > span:first-child { width: 38px; height: 38px; display: grid; place-items: center; flex: 0 0 38px; color: var(--blue); border-radius: 9px; background: var(--blue-soft); }
 .capability-list { min-height: 95px; display: flex; align-content: flex-start; flex-wrap: wrap; gap: 6px; padding: 15px; }.capability-list span { height: 25px; display: inline-flex; align-items: center; gap: 5px; padding: 0 7px; color: #92a0b2; border: 1px solid var(--line); border-radius: 5px; font-size: 8px; }.capability-list svg { width: 10px; color: var(--green); }
 .observation-card { margin-top: 12px; }
 .key-value-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; }.key-value-grid.compact { grid-template-columns: repeat(3,1fr); padding: 14px; }

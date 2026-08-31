@@ -50,7 +50,7 @@ export function StatusBadge({ value, dot = true }: { value: unknown; dot?: boole
   return (
     <span className={classes("status-badge", statusTone(value))}>
       {dot ? <i /> : null}
-      {label.replaceAll("_", " ")}
+      <span className="status-label">{label.replaceAll("_", " ")}</span>
     </span>
   );
 }
