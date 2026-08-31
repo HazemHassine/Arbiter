@@ -1,5 +1,13 @@
 # Arbiter
 
+[![Documentation](https://img.shields.io/badge/docs-arbiter--docs.hazemhassine.space-0f172a?logo=readthedocs&logoColor=white)](https://arbiter-docs.hazemhassine.space)
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=next.js&logoColor=white)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=111827)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Docker](https://img.shields.io/badge/Docker-supported-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+
 Arbiter is a local-first Linux control plane for understanding and safely
 reconciling projects, Docker/Compose resources, host processes, ports, files,
 and development servers.
