@@ -12,6 +12,7 @@
     "types:check": "next typegen && tsc --noEmit"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
     "cnfast": "^0.1.0",
     "fumadocs-core": "16.15.4",
     "fumadocs-mdx": "15.4.0",
