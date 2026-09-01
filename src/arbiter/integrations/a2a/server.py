@@ -34,8 +34,7 @@ class A2AAdapter:
         if skill == "check_stack_readiness":
             return {
                 "readiness": [
-                    item.model_dump(mode="json")
-                    for item in self.agent.services.stacks.check_stack_readiness(project)
+                    item.model_dump(mode="json") for item in self.agent.services.stacks.check_stack_readiness(project)
                 ]
             }
         raise ValueError(f"Unsupported A2A skill: {skill}")
