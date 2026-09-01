@@ -1,0 +1,170 @@
+---
+title: REST API & Streaming Reference
+description: Exhaustive endpoint documentation for Arbiter REST API, SSE events, and NDJSON streaming.
+---
+
+# REST API & Streaming Reference
+
+Arbiter exposes a complete, typed REST API under `http://127.0.0.1:8765/api/v1`. By default, the API binds strictly to `127.0.0.1` for local safety.
+
+---
+
+## Health & Discovery Endpoints
+
+### `GET /health`
+Returns the status, server name, and active version of the Arbiter daemon.
+- **Response**: `{"status": "ok", "name": "Arbiter", "version": "0.5.0"}`
+
+### `GET /.well-known/agent-card.json`
+Returns the standardized Agent-to-Agent (A2A) Agent Card declaring Arbiter's skills and task endpoints.
+
+---
+
+## Ports Endpoints (`/api/v1/ports`)
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/v1/ports` | List all active host TCP listening ports and correlated process/Docker owners. |
+| `GET` | `/api/v1/ports/free` | Find `count` free host ports in the configured or requested range (`?start=3000&end=4000&count=5`). |
+| `GET` | `/api/v1/ports/conflicts` | Detect collisions across registered project declarations and live host sockets. |
+| `POST` | `/api/v1/ports/suggest` | Suggest the nearest free port at or above `{"preferred_port": 3000}`. |
+| `GET` | `/api/v1/ports/{port}` | Inspect process or Docker container owning a specific port (or `{"available": true}`). |
+
+---
+
+## Projects Endpoints (`/api/v1/projects`)
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/v1/projects` | List all registered development projects. |
+| `POST` | `/api/v1/projects` | Register a new project by path (`{"path": "/home/user/dev/app"}`). |
+| `POST` | `/api/v1/projects/scan` | Scan configured `PROJECT_ROOTS` up to `PROJECT_SCAN_DEPTH` for projects. |
+| `GET` | `/api/v1/projects/{id}` | Inspect registered project metadata, compose files, and detected ports. |
+| `DELETE` | `/api/v1/projects/{id}` | Unregister project from SQLite database without deleting any files. |
+| `GET` | `/api/v1/projects/{id}/workspace` | Get workspace topology graph specific to the project. |
+| `GET` | `/api/v1/projects/{id}/ports` | List ports declared across the project's Compose services. |
+| `GET` | `/api/v1/projects/{id}/services` | List all Compose service names in the project. |
+| `GET` | `/api/v1/projects/{id}/environment` | Get resolved environment key-value pairs for the project. |
+| `GET` | `/api/v1/projects/{id}/status` | Diagnose project status, stopped containers, and missing variables. |
+| `GET` | `/api/v1/projects/{id}/reconciliation-plan` | Generate dry-run port conflict resolution plan. |
+| `POST` | `/api/v1/projects/{id}/prepare` | Propose port conflict reconciliation and create safety approval. |
+| `POST` | `/api/v1/projects/{id}/start` | Propose starting project containers via Compose. |
+| `POST` | `/api/v1/projects/{id}/stop` | Propose stopping project containers. |
+| `POST` | `/api/v1/projects/{id}/restart` | Propose restarting project containers. |
+
+---
+
+## File Editor Endpoints (`/api/v1/projects/{id}/files`)
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/v1/projects/{id}/files` | List editable configuration files (`.env*`, `compose*.yaml`, `Makefile`, `Dockerfile*`). |
+| `GET` | `/api/v1/projects/{id}/files/content?path=...` | Read configuration file content and SHA-256 hash. |
+| `POST` | `/api/v1/projects/{id}/files/preview` | Preview unified diff and secret-masked changes. |
+| `POST` | `/api/v1/projects/{id}/files/save` | Stage reviewed file save with `expected_sha256` verification. |
+| `POST` | `/api/v1/projects/{id}/files/undo` | Undo latest managed edit from automatic backup. |
+
+---
+
+## Makefile & Dockerfile Endpoints
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/v1/projects/{id}/make/targets` | List parsed Makefile targets, comments, and risk levels. |
+| `GET` | `/api/v1/projects/{id}/make/targets/{target}` | Inspect specific Make target and commands. |
+| `POST` | `/api/v1/projects/{id}/make/targets/{target}/run` | Propose running a Make target in project directory. |
+| `GET` | `/api/v1/projects/{id}/dockerfiles` | Inspect Dockerfile base images, exposed ports, and multi-stage builds. |
+
+---
+
+## Docker & Compose Endpoints
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/v1/containers` | List all local Docker containers with Compose metadata. |
+| `GET` | `/api/v1/containers/{id}` | Inspect detailed container properties and port mappings. |
+| `GET` | `/api/v1/containers/{id}/logs?tail=200` | Stream recent container log lines on demand. |
+| `GET` | `/api/v1/containers/{id}/stats` | Fetch one-shot CPU, memory, and network metrics. |
+| `POST` | `/api/v1/containers/{id}/start` | Propose starting a stopped container (`LOW_RISK`). |
+| `POST` | `/api/v1/containers/{id}/stop` | Propose stopping a container (`LOW_RISK`). |
+| `POST` | `/api/v1/containers/{id}/restart` | Propose restarting a container (`LOW_RISK`). |
+| `GET` | `/api/v1/images` | List Docker images. |
+| `DELETE` | `/api/v1/images/{id}` | Propose image removal (`HIGH_RISK`). |
+| `GET` | `/api/v1/volumes` | List Docker volumes. |
+| `DELETE` | `/api/v1/volumes/{id}` | Propose volume removal (`DESTRUCTIVE`). |
+| `GET` | `/api/v1/networks` | List Docker networks. |
+| `GET` | `/api/v1/docker/disk-usage` | Get Docker disk usage breakdown across images, volumes, and cache. |
+| `GET` | `/api/v1/compose/projects` | List Compose projects grouped by project label and working directory. |
+| `POST` | `/api/v1/compose/projects/{id}/validate` | Validate Compose file syntax with `compose config`. |
+| `POST` | `/api/v1/compose/projects/{id}/services/{service}/restart` | Restart a specific Compose service container. |
+| `POST` | `/api/v1/compose/projects/{id}/services/port` | Rewrite host port binding in Compose file and recreate service. |
+
+---
+
+## Multi-Project Stacks Endpoints (`/api/v1/stacks`)
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/v1/stacks` | List all stack presets. |
+| `POST` | `/api/v1/stacks` | Create a new multi-project stack preset. |
+| `POST` | `/api/v1/stacks/seed-defaults` | Seed default environment stack presets if empty. |
+| `GET` | `/api/v1/stacks/active` | Get the currently running stack preset. |
+| `GET` | `/api/v1/stacks/{id}` | Inspect a stack preset by ID or name. |
+| `PUT` | `/api/v1/stacks/{id}` | Update stack metadata, projects, or tags. |
+| `DELETE` | `/api/v1/stacks/{id}` | Delete a stack preset from database. |
+| `GET` | `/api/v1/stacks/{id}/boot-order` | Compute DAG boot plan using Kahn's algorithm. |
+| `GET` | `/api/v1/stacks/{id}/readiness` | Evaluate live readiness gates (`tcp_port`, `http_get`, `docker_health`). |
+| `POST` | `/api/v1/stacks/{id}/readiness/authorizations` | Request operator approvals for non-local readiness gates. |
+| `GET` | `/api/v1/readiness/authorizations` | List persisted readiness destination grants. |
+| `DELETE` | `/api/v1/readiness/authorizations/{id}` | Revoke a readiness grant. |
+| `POST` | `/api/v1/stacks/{id}/switch` | Propose 1-click context switch to target stack. |
+| `POST` | `/api/v1/stacks/{id}/stop` | Propose stopping/hibernating active stack containers. |
+
+---
+
+## Config & Secrets Intelligence Endpoints
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/v1/config-drift` | Global port drift and missing environment variable audit. |
+| `GET` | `/api/v1/projects/{id}/config-drift` | Config drift audit for a specific registered project. |
+
+---
+
+## Topology & Search Endpoints
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/v1/topology` | Fetch complete live machine topology graph (`?project=name`). |
+| `GET` | `/api/v1/topology/project/{id}` | Fetch topology scoped to a single project. |
+| `GET` | `/api/v1/resources/{type}/{id:path}` | Inspect a resource and its direct neighbors. |
+| `GET` | `/api/v1/search?q=...&limit=30` | Keyword search across all topology nodes. |
+| `POST` | `/api/v1/intelligence/filter` | Natural language resource query filter plan. |
+
+---
+
+## Safety & Approvals Endpoints (`/api/v1/approvals`)
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/v1/approvals` | List all pending and historical safety approvals. |
+| `GET` | `/api/v1/approvals/{id}` | Inspect approval payload, arguments, and time-travel visual diff. |
+| `POST` | `/api/v1/approvals/{id}/approve` | Approve and execute stored action payload with verification. |
+| `POST` | `/api/v1/approvals/{id}/reject` | Reject a pending safety approval. |
+| `GET` | `/api/v1/actions` | Query immutable audit log of executed actions and verification results. |
+| `POST` | `/api/v1/impact` | Compute pre-execution impact analysis for an action. |
+
+---
+
+## Streaming Endpoints
+
+### 1. Activity Stream (Server-Sent Events)
+- **Endpoint**: `GET /api/v1/events/stream`
+- **Media Type**: `text/event-stream`
+- **Description**: Real-time stream of Docker lifecycle events (container start, stop, die, destroy) and host process observations.
+
+### 2. AI Agent Query Stream (NDJSON)
+- **Endpoint**: `POST /api/v1/agent/query/stream`
+- **Media Type**: `application/x-ndjson`
+- **Request Body**: `{"message": "What is using port 5432?"}`
+- **Description**: Streams typed agent execution events (`phase`, `routing`, `tool_call_start`, `tool_call_end`, `message`, `error`) with sanitized traces and markdown text deltas.

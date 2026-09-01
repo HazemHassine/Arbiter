@@ -1,0 +1,81 @@
+---
+title: Terminal UI (TUI) Mode
+description: Fast, keyboard-driven terminal dashboard for navigating ports, containers, approvals, and logs.
+---
+
+# Terminal UI (TUI) Dashboard (`arbiter tui`)
+
+Arbiter includes a fast, keyboard-driven **Terminal UI (TUI)** mode inspired by tools like `lazydocker` and `k9s`. It allows engineers to inspect runtime state, manage container logs, review pending approvals, and troubleshoot port conflicts without ever leaving the terminal.
+
+```text
+┌─ Arbiter v0.5.0 ──────────────────────────────────────────────┐
+│ [1] Ports  [2] Containers  [3] Approvals  [4] Projects  [5] Logs  [6] Readiness │
+├────────────────────────────────┬──────────────────────────────┤
+│ PORT  PROTO  PROCESS    PID    │ Details: Port 5432           │
+│ 5432  tcp    postgres   12345  │ Process: /usr/lib/postgresql │
+│ 3000  tcp    node       23411  │ PID: 12345 (ppid: 1)         │
+│ 8080  tcp    docker-pr  88921  │ Docker: db-postgres-1        │
+│ 6379  tcp    redis-ser  10293  │ Compose: backend / db        │
+│                                │ Status: Active / Healthy     │
+├────────────────────────────────┴──────────────────────────────┤
+│ [j/k] Navigate  [Tab/1..6] Tabs  [a] Approve  [/] Search  [q] Quit │
+└───────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Launching the TUI
+
+To start the interactive full-screen dashboard:
+
+```bash
+arbiter tui
+```
+
+---
+
+## Tabbed Views
+
+Switch between tabs using number keys `1` through `6` or the `Tab` / `Shift+Tab` keys:
+
+### 1. `[1] Ports`
+Displays all currently listening host TCP sockets, resolved process owners, process command lines, PIDs, and Docker container mappings. Conflicts are highlighted with warning indicators.
+
+### 2. `[2] Containers`
+Lists all local Docker containers with live status (`running`, `exited`), health probe states (`healthy`, `unhealthy`), published port forwards, and Compose service labels.
+
+### 3. `[3] Approvals`
+Lists all pending, executed, or rejected safety approval requests. Press `Enter` to inspect the full serialized argument payload and dry-run time-travel diffs, or press `a` to immediately approve and execute.
+
+### 4. `[4] Projects`
+Shows all registered repositories and their Compose files, detected services, and declared environment ports. Press `p` on any project to automatically trigger agent preparation and conflict resolution.
+
+### 5. `[5] Logs`
+Streams live, auto-refreshing logs from the currently selected Docker container with ANSI color formatting and auto-scrolling.
+
+### 6. `[6] Readiness`
+Shows live dependency readiness gates for active stack presets. Lists granted network access authorizations and allows revoking grants with `x`.
+
+---
+
+## Complete Keybindings Reference
+
+| Key | Action | Description |
+| :--- | :--- | :--- |
+| `j` / `Down` | Move Down | Select the next item in the active table/list. |
+| `k` / `Up` | Move Up | Select the previous item in the active table/list. |
+| `g` | Jump to Top | Move cursor to the first row in the list. |
+| `G` | Jump to Bottom | Move cursor to the last row in the list. |
+| `1` .. `6` | Switch Tab | Direct jump to tab 1 (Ports) through 6 (Readiness). |
+| `Tab` | Next Tab | Cycle forward through tabs. |
+| `Shift+Tab` | Previous Tab | Cycle backward through tabs. |
+| `Enter` | Inspect / Drill Down | Open the full details modal or side pane for the selected item. |
+| `a` | Approve Action | Approve and execute the selected pending safety action. |
+| `p` | Prepare Project | Propose conflict reconciliation for the selected project. |
+| `l` | Stream Logs | Switch straight to the Logs tab for the selected container. |
+| `x` | Revoke Access | Revoke a selected readiness destination authorization grant. |
+| `r` | Force Refresh | Query the Linux kernel and Docker daemon for fresh state. |
+| `/` | Fuzzy Search | Open live search bar to filter entries in the active tab. |
+| `Esc` | Clear / Close | Close open modal, search bar, or inspect drawer. |
+| `?` | Help Overlay | Display an on-screen summary of all available shortcuts. |
+| `q` / `Ctrl+C` | Quit | Exit the TUI and restore terminal screen buffer. |

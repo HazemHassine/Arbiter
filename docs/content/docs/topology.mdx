@@ -1,0 +1,105 @@
+---
+title: Topology & Resource Graph
+description: Live workstation resource graph, Linux kernel correlations, and natural-language filtering.
+---
+
+# Topology & Machine Resource Graph
+
+Arbiter continuously synthesizes a connected, real-time **Topology Graph** of your workstation. Rather than treating Docker, processes, files, and ports as isolated data silos, Arbiter connects them into a unified, queryable relational machine graph.
+
+```text
+┌────────────────┐      declares       ┌──────────────────┐
+│  Project Root  ├────────────────────►│   Compose File   │
+└───────┬────────┘                     └────────┬─────────┘
+        │                                       │ defines
+        │ contains                     ┌────────▼─────────┐
+        ▼                              │ Compose Service  │
+┌────────────────┐                     └────────┬─────────┘
+│   Dockerfile   │                              │ instances
+└────────────────┘                     ┌────────▼─────────┐
+                                       │ Docker Container │
+                                       └──┬─────┬───────┬─┘
+                  mounts / attaches       │     │       │ publishes
+       ┌──────────────────────────────────┘     │       └─────────────┐
+       ▼                                        ▼                     ▼
+┌──────────────┐                         ┌─────────────┐       ┌─────────────┐
+│    Volume    │                         │   Network   │       │ Host Port   │
+└──────────────┘                         └─────────────┘       └──────┬──────┘
+                                                                      │ bound by
+                                                               ┌──────▼──────┐
+                                                               │ Host Process│
+                                                               │ (PID/proc)  │
+                                                               └─────────────┘
+```
+
+---
+
+## Real-Time Correlation Sources
+
+Arbiter queries the Linux kernel and local services without persistent caching:
+
+1. **Linux `ss` (Socket Statistics)**: Captures exact TCP listening sockets, inode references, and bind addresses (`127.0.0.1`, `0.0.0.0`, `::`).
+2. **Linux `/proc` Filesystem**: Correlates socket inodes with process IDs (`/proc/<pid>/fd/*`), extracting binary names (`comm`), full command lines (`cmdline`), working directories (`cwd`), and parent PIDs.
+3. **Docker Engine API**: Queries container inspection data, Compose project and service labels (`com.docker.compose.project`, `com.docker.compose.service`), port forwards, networks, volumes, and image tags.
+4. **Project File Parsers**: Parses registered `compose.yaml`, `.env`, `Makefile`, and `Dockerfile` files to correlate declared intentions with live runtime states.
+
+---
+
+## Topology Node Types
+
+| Node Type | Source | Attributes & Metadata |
+| :--- | :--- | :--- |
+| `project` | SQLite Registry | Name, absolute path, detected services, registered timestamp. |
+| `compose_file` | Project Files | File path, syntax version, defined services, volumes, networks. |
+| `compose_service` | Compose Spec | Service name, image reference, declared environment vars, declared ports. |
+| `container` | Docker API | Container ID, name, status (`running`, `exited`), health, uptime. |
+| `image` | Docker API | Image ID, repository tags, size in bytes. |
+| `volume` | Docker API | Volume name, driver, mountpoint, scope. |
+| `network` | Docker API | Network ID, name, driver (`bridge`, `host`, `overlay`). |
+| `port` | Linux `ss` + Docker | Port number, protocol (`tcp`), bind address, runtime conflict status. |
+| `process` | Linux `/proc` | PID, PPID, executable name, command line, working directory. |
+| `dockerfile` | Project Files | Path, base image (`FROM`), exposed ports (`EXPOSE`), entrypoints. |
+| `make_target` | Project Files | Target name, prerequisite targets, inferred commands, risk tier. |
+
+---
+
+## Interactive Topology Canvas (Web UI)
+
+The browser control panel (`http://127.0.0.1:8765/#topology`) provides an interactive visualization canvas:
+
+- **Zoom & Fit Controls**: Navigate complex multi-project resource graphs with smooth pan/zoom.
+- **Path Tracing & Connected Focus**: Click any node (e.g. Port `5432`) to highlight all connected resources (Postgres container → Backend service → Compose file → Project root).
+- **Project Scoping**: Filter the canvas view to show only nodes belonging to a single registered workspace.
+- **Resource Inspector Drawer**: Click any resource to view its live runtime properties, open file descriptors, logs, and direct dependencies.
+
+---
+
+## Natural Language Topology Query Engine
+
+Arbiter allows querying the topology using natural language via the REST API or Web UI:
+
+```bash
+# Filter topology resources using natural language
+curl -X POST http://127.0.0.1:8765/api/v1/intelligence/filter \
+  -H 'Content-Type: application/json' \
+  -d '{"query": "show all containers published on port 3000 or 8080"}'
+```
+
+### Response Filter Plan
+
+```json
+{
+  "query": "show all containers published on port 3000 or 8080",
+  "plan": {
+    "node_types": ["container", "port"],
+    "predicates": [
+      {"field": "port", "operator": "in", "values": [3000, 8080]}
+    ]
+  },
+  "matching_node_ids": [
+    "container:a1b2c3d4e5f6",
+    "port:3000",
+    "port:8080"
+  ]
+}
+```

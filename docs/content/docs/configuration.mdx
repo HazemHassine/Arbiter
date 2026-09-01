@@ -1,63 +1,49 @@
 ---
-title: Configuration
-description: Environment variables and application configuration
+title: Configuration Reference
+description: Environment variables, settings, safety flags, and discovery parameters.
 ---
 
-# Configuration
+# Configuration Reference
 
-The root `.env.example` file documents the supported settings for configuring Arbiter.
+Arbiter is configured using environment variables loaded from a `.env` file located in the root directory, or via system environment variables.
 
-Copy the example file to `.env` to override the defaults.
+Copy the provided `.env.example` template to create your `.env` file:
 
 ```bash
 cp .env.example .env
 ```
 
-## Example `.env`
+---
 
-```bash
-# Server bindings
-ARBITER_HOST=127.0.0.1
-ARBITER_PORT=8765
-ALLOW_REMOTE_ACCESS=false
+## Complete Settings Table
 
-# Data persistence
-DATABASE_URL=sqlite:///./arbiter.db
+| Variable | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `ARBITER_HOST` | `string` | `127.0.0.1` | Network interface IP address to bind the REST API and Web UI server. Must remain loopback (`127.0.0.1` or `::1`) unless `ALLOW_REMOTE_ACCESS=true`. |
+| `ARBITER_PORT` | `integer` | `8765` | TCP port for the REST API and Web UI server. |
+| `ALLOW_REMOTE_ACCESS` | `boolean` | `false` | Security override allowing non-loopback binds (e.g. `0.0.0.0`). *Caution: Arbiter does not include built-in multi-tenant authentication.* |
+| `DATABASE_URL` | `string` | `sqlite:///./arbiter.db` | SQLAlchemy database connection string for persisting registered projects, approvals, stack presets, and action audit logs. |
+| `PROJECT_ROOTS` | `string` (comma-separated) | `""` | Base directory paths to search when discovering development repositories (e.g. `/home/user/dev,/home/user/work`). |
+| `PROJECT_SCAN_DEPTH` | `integer` (1 to 8) | `4` | Maximum directory recursion depth during automatic project discovery scans. |
+| `LLM_BASE_URL` | `string` | `https://api.openai.com/v1` | Base URL for OpenAI-compatible LLM endpoints (supports OpenAI, Ollama, vLLM, LiteLLM, OpenRouter). |
+| `LLM_API_KEY` | `string` | `""` | API key for LLM authentication (can be left blank when using local Ollama). |
+| `LLM_MODEL` | `string` | `""` | Model identifier for natural language agent query reasoning (e.g. `gpt-4o`, `gpt-4o-mini`, `claude-3-5-sonnet`, `llama3.2`). |
+| `LLM_REASONING_EFFORT` | `string` | `none` | Reasoning effort tier for reasoning models (`none`, `low`, `medium`, `high`). |
+| `FILTER_LLM_MODEL` | `string` | `gpt-5.4-nano` | Lightweight model for translating natural-language topology queries into structured JSON filter plans. Falls back to offline regex parser if unavailable. |
+| `AGENT_MAX_STEPS` | `integer` | `12` | Maximum tool-calling loop iterations the agent may execute per user query before returning a response. |
+| `AUTO_APPROVE_READ_ONLY` | `boolean` | `true` | When `true`, automatically allows `READ_ONLY` inspection and diagnostic operations without generating approval requests. |
+| `AUTO_APPROVE_LOW_RISK` | `boolean` | `false` | When `true`, automatically allows `LOW_RISK` actions (e.g., starting a stopped container) without requiring explicit approval. |
+| `DEFAULT_PORT_SEARCH_RANGE_START` | `integer` | `3000` | Lower bound for deterministic free port allocation algorithms. |
+| `DEFAULT_PORT_SEARCH_RANGE_END` | `integer` | `9999` | Upper bound for deterministic free port allocation algorithms. |
+| `OBSERVATION_INTERVAL_SECONDS` | `float` | `3.0` | Background observation polling interval for Linux socket and process state synchronization. |
+| `SUBPROCESS_TIMEOUT` | `float` | `30.0` | Default timeout in seconds for subprocess executions (Docker CLI, Make, etc.). |
 
-# Comma-separated list of directories to scan for projects
-PROJECT_ROOTS=/home/user/dev
-PROJECT_SCAN_DEPTH=4
+---
 
-# LLM integration
-LLM_BASE_URL=https://api.openai.com/v1
-LLM_API_KEY=
-LLM_MODEL=
-LLM_REASONING_EFFORT=none
-FILTER_LLM_MODEL=gpt-5.4-nano
-AGENT_MAX_STEPS=12
+## Security Boundaries & Bind Host Policy
 
-# Safety policy defaults
-AUTO_APPROVE_READ_ONLY=true
-AUTO_APPROVE_LOW_RISK=false
+Arbiter enforces strict network isolation out of the box:
 
-# Port allocation range
-DEFAULT_PORT_SEARCH_RANGE_START=3000
-DEFAULT_PORT_SEARCH_RANGE_END=9999
-
-# Live observation refresh interval
-OBSERVATION_INTERVAL_SECONDS=3
-```
-
-## Important Settings
-
-### `PROJECT_ROOTS` and `PROJECT_SCAN_DEPTH`
-A comma-separated list of base directories and a bounded discovery depth from 1 to 8. Arbiter never scans the whole filesystem.
-
-### `LLM_*` variables
-Configure `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL` for open-ended tool calling. Core and deterministic natural-language operations do not require an LLM.
-
-### API Host
-The API host (`ARBITER_HOST`) should remain loopback (`127.0.0.1`). Arbiter
-refuses a non-loopback bind unless `ALLOW_REMOTE_ACCESS=true`; that escape hatch
-is not a substitute for authentication or an external security boundary. Legacy
-`DEV_AGENT_HOST` and `DEV_AGENT_PORT` aliases remain accepted during migration.
+- **Loopback Enforcement**: If `ARBITER_HOST` is set to any non-loopback IP (such as `0.0.0.0` or a LAN IP) while `ALLOW_REMOTE_ACCESS` is `false`, Arbiter will refuse to start with an immediate configuration error.
+- **Bounded Scans**: Arbiter never performs unconstrained root filesystem scans. Discovery is strictly bounded by `PROJECT_ROOTS` and `PROJECT_SCAN_DEPTH`.
+- **Secret Redaction**: Environment variables containing sensitive keywords (`PASSWORD`, `SECRET`, `TOKEN`, `API_KEY`, `PRIVATE_KEY`, `CREDENTIAL`) are masked across all UI, CLI, REST API, and MCP outputs.

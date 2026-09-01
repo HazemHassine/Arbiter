@@ -1,0 +1,115 @@
+---
+title: Safety, Approvals & Verification
+description: The 5 risk tiers, immutable approvals, time-travel diffs, and post-action verification.
+---
+
+# Safety, Approvals & Verification Engine
+
+Arbiter is designed around a single core principle: **an AI agent or automation engine should never perform destructive or mutating operations on a developer's machine without explicit, verifiable human oversight**.
+
+It operates strictly on an **observe → diagnose → propose → approve → act → verify** loop.
+
+```text
+┌─────────────┐      ┌──────────────┐      ┌─────────────┐
+│ 1. Observe  ├─────►│ 2. Diagnose  ├─────►│ 3. Propose  │
+└─────────────┘      └──────────────┘      └──────┬──────┘
+                                                  │ (ActionSpec)
+┌─────────────┐      ┌──────────────┐      ┌──────▼──────┐
+│ 6. Verify   │◄─────┤    5. Act    │◄─────┤ 4. Approve  │
+│  (Rollback  │      │  (Execute)   │      │  (Operator) │
+│  on failure)│      └──────────────┘      └─────────────┘
+└─────────────┘
+```
+
+---
+
+## The 5 Risk Levels
+
+Every action in Arbiter is classified into one of five explicit risk tiers:
+
+| Risk Tier | Meaning | Operations | Default Behavior |
+| :--- | :--- | :--- | :--- |
+| `READ_ONLY` | Read-only inspection and diagnosis | Listing ports, inspecting topology, container logs, reading file previews | **Auto-Approved** (`AUTO_APPROVE_READ_ONLY=true`) |
+| `LOW_RISK` | Lightweight, easily reversible actions | Starting stopped containers, stopping non-critical containers | **Approval Required** (Can set `AUTO_APPROVE_LOW_RISK=true`) |
+| `MEDIUM_RISK` | Configuration edits, service restarts | Modifying `.env` or `compose.yaml`, restarting Compose services, stack switches | **Always Requires Approval** |
+| `HIGH_RISK` | Resource deletion, image cleanup | Removing Docker images, pruning networks | **Always Requires Approval** |
+| `DESTRUCTIVE` | Irreversible persistent data loss | Deleting Docker volumes, wiping project databases | **Always Explicit Approval** |
+
+---
+
+## Immutable Approval Objects
+
+When an action requires approval, Arbiter does not execute it. Instead, it creates a persisted approval record in SQLite:
+
+```json
+{
+  "id": "appr_7f3b89a2-4c6e-41d8-9e5a-38b9c2419f01",
+  "request_id": "req_88192a40",
+  "action": "compose.change_port",
+  "summary": "Change web-service/web host port from 3000 to 3001",
+  "risk": "MEDIUM_RISK",
+  "arguments": {
+    "project_id": "proj_11928a",
+    "service": "web",
+    "old_port": 3000,
+    "new_port": 3001
+  },
+  "status": "pending",
+  "expires_at": "2026-09-01T02:30:00Z"
+}
+```
+
+### Safety Guarantees
+
+1. **Payload Immutability**: The agent cannot change or substitute arguments after generating an approval request. Execution runs *strictly* the serialized JSON stored in the database.
+2. **One-Time Execution**: An approval cannot be executed more than once. Expired, rejected, or completed approvals are rejected immediately upon subsequent execution attempts.
+3. **Port Reservations**: As soon as an approval involving port changes is staged, Arbiter temporarily reserves the target port (`new_port: 3001`) in memory to prevent other processes or stack boots from claiming it in a race condition.
+
+---
+
+## Visual Diffs & Dry-Run Time Travel
+
+Every approval request for file edits or port reconciliations is accompanied by a **Time-Travel Dry Run Preview**:
+
+- **Unified File Diff**: Shows line-by-line additions and deletions with automatic secret masking.
+- **Resource State Transitions**: Forecasts which containers will be recreated, which ports will be released, and which services will be updated.
+
+```diff
+--- compose.yaml (Current)
++++ compose.yaml (Proposed)
+@@ -12,3 +12,3 @@
+     ports:
+-      - "3000:80"
++      - "3001:80"
+```
+
+---
+
+## Verification & Automatic Compensation Rollback
+
+Execution success and verification success are strictly decoupled. An action is only marked `completed` if post-action verification checks succeed.
+
+### Verification Matrix
+
+- **Port Reassignment**: Arbiter validates that the Compose file is syntactically valid, starts the recreated container, and inspects Linux socket tables to confirm the expected process owns the new port.
+- **File Updates**: Arbiter verifies that the target file exists, matches the SHA-256 hash, and that syntax validators pass.
+- **Stack Switches**: Arbiter probes each stage's readiness gates (`tcp_port`, `http_get`, `docker_health`) before proceeding to downstream dependencies.
+
+### Automatic Compensation & Rollback
+
+If any step of a port reconciliation or file edit fails (e.g. `docker compose up` crashes due to invalid syntax):
+
+1. Arbiter immediately restores the original file from an automatic backup (`.bak.<timestamp>`).
+2. Arbiter attempts to restore the original container state.
+3. The action result is marked `verification_failed`, recording full error diagnostics in the audit log.
+
+---
+
+## Network Destination Safety Policy
+
+To prevent Server-Side Request Forgery (SSRF) and DNS rebinding attacks when probing external stack readiness gates:
+
+1. **Loopback & Compose Services**: Localhost (`127.0.0.1`, `::1`) and registered Docker Compose service names are probed automatically.
+2. **External Non-Local Targets**: Any external hostname or IP returns `approval_required` until the developer explicitly approves an authorization grant scoped to protocol, host, port, and resolved IP addresses.
+3. **DNS Rebinding Prevention**: Arbiter resolves the hostname before connecting and binds directly to the validated IP address.
+4. **Hard Denials**: Link-local addresses (`169.254.0.0/16`), cloud metadata services (`http://169.254.169.254`), multicast, and broadcast addresses are unconditionally blocked.

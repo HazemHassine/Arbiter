@@ -1,0 +1,133 @@
+---
+title: AI Agent & Tool Runtime
+description: LangChain/LangGraph agent architecture, typed tool registry, model providers, and NDJSON streaming.
+---
+
+# AI Agent & Tool Calling Runtime
+
+Arbiter features an intelligent agent runtime that combines **deterministic intent dispatching** with **LangChain v1 / LangGraph tool-calling agents**. It is designed to safely answer natural-language infrastructure queries, diagnose runtime issues, and propose environment fixes without having unrestricted shell or arbitrary filesystem write access.
+
+```text
+┌────────────────────────────────────────────────────────┐
+│             User Query / REST / Web UI / CLI           │
+└───────────────────────────┬────────────────────────────┘
+                            │
+┌───────────────────────────▼────────────────────────────┐
+│              Deterministic Intent Router               │
+│      (Handles common patterns instantly without LLM)   │
+└───────────────────────────┬────────────────────────────┘
+                            │ (fallback for complex queries)
+┌───────────────────────────▼────────────────────────────┐
+│           LangGraph Tool-Calling Agent Loop            │
+│   ┌────────────────────────────────────────────────┐   │
+│   │ Models: OpenAI / Anthropic / Ollama / Local    │   │
+│   ├────────────────────────────────────────────────┤   │
+│   │ Typed Tool Registry (23+ Read/Propose Tools)   │   │
+│   ├────────────────────────────────────────────────┤   │
+│   │ Redaction & Privacy Guard                      │   │
+│   └────────────────────────────────────────────────┘   │
+└───────────────────────────┬────────────────────────────┘
+                            │ NDJSON / Markdown Stream
+┌───────────────────────────▼────────────────────────────┐
+│      Structured Audit Events + Explanatory Output      │
+└────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Agent Architecture Principles
+
+1. **Deterministic-First**: If a user asks a predictable query (e.g., *"What is using port 5432?"* or *"List all containers"*), the agent routes directly to optimized service calls without incurring LLM latency or token costs.
+2. **Strict Tool Boundaries**: The LLM interacts with the host *only* through typed, structured tools (e.g., `find_port_owner`, `detect_port_conflicts`, `inspect_docker`). It has **no raw shell (`bash`) tool** and **no arbitrary file edit tool**.
+3. **Propose-Only Mutations**: If the agent decides a configuration file needs editing or a container needs recreating, it cannot perform the action directly. It can only generate a typed `ActionSpec`, which yields a persisted safety approval.
+4. **Redacted Execution Trace**: Streaming traces provide full transparency over model routing, tool invocations, and execution phases, while redacting sensitive environment variables and omitting private model chain-of-thought.
+
+---
+
+## Supported LLM Providers & Configuration
+
+Arbiter supports any standard OpenAI-compatible API, Anthropic, or local model providers.
+
+### Environment Configuration (`.env`)
+
+```bash
+# OpenAI or OpenAI-Compatible API (Ollama, vLLM, OpenRouter, LiteLLM)
+LLM_BASE_URL=https://api.openai.com/v1
+LLM_API_KEY=sk-...
+LLM_MODEL=gpt-4o-mini
+LLM_REASONING_EFFORT=none
+
+# Lightweight model for natural language topology search
+FILTER_LLM_MODEL=gpt-5.4-nano
+
+# Maximum tool loop iterations per query
+AGENT_MAX_STEPS=12
+```
+
+### Local Models via Ollama
+To run completely offline with Ollama:
+
+```bash
+LLM_BASE_URL=http://127.0.0.1:11434/v1
+LLM_API_KEY=ollama
+LLM_MODEL=llama3.2
+```
+
+---
+
+## Typed Agent Tool Registry
+
+The agent runtime exposes 23+ structured tools registered via `arbiter/agent/tools.py`:
+
+| Tool Name | Scope | Description |
+| :--- | :--- | :--- |
+| `topology_get` | Topology | Fetch complete live machine graph. |
+| `resource_inspect` | Topology | Inspect one resource and its direct neighbors. |
+| `project_inspect` | Projects | Retrieve workspace topology and Compose evidence. |
+| `project_diagnose` | Projects | Analyze errors, missing ports, and stopped containers. |
+| `project_reconciliation_plan` | Projects | Generate dry-run port conflict resolution plan. |
+| `config_drift_audit` | Config | Audit `.env` drift vs `compose.yaml` and `.env.example`. |
+| `list_ports` | Ports | List active TCP listening ports and process owners. |
+| `find_port_owner` | Ports | Find PID/container owning a specific TCP port. |
+| `find_free_port` | Ports | Find available host port at or above target port. |
+| `detect_port_conflicts` | Ports | Detect duplicate port claims across projects. |
+| `containers_list` | Docker | List all containers with Compose labels. |
+| `container_inspect` | Docker | Inspect detailed Docker container inspection state. |
+| `volume_inspect` | Docker | Inspect Docker volume metadata. |
+| `network_inspect` | Docker | Inspect Docker network bridge/driver state. |
+| `processes_list` | System | List processes with listening ports and cmdlines. |
+| `process_inspect` | System | Inspect specific process by PID. |
+| `make_targets_list` | Makefile | Extract targets and comments from project Makefile. |
+| `dockerfile_inspect` | Dockerfile | Heuristic inspection of Dockerfile stages and exposures. |
+| `prepare_project` | Mutation | Propose port conflict reconciliation and approval. |
+| `stacks_list` | Stacks | List multi-project presets and active state. |
+| `stack_inspect` | Stacks | Inspect stack members, tags, and readiness probes. |
+| `stack_boot_order` | Stacks | Compute DAG boot plan with Kahn's algorithm. |
+| `stack_readiness_check` | Stacks | Probe TCP/HTTP/Docker health check gates. |
+| `stack_readiness_request_access` | Stacks | Request operator approvals for non-local probes. |
+| `stack_switch` | Stacks | Propose 1-click context switch to target stack. |
+
+---
+
+## Streaming Protocol (`POST /api/v1/agent/query/stream`)
+
+The browser control panel and API clients receive real-time execution feedback via **NDJSON (Newline-Delimited JSON)** streaming.
+
+### Event Frame Types
+
+```json
+{"type": "phase", "phase": "routing", "description": "Analyzing intent..."}
+{"type": "tool_call_start", "name": "list_ports", "arguments": {}}
+{"type": "tool_call_end", "name": "list_ports", "result": [{"port": 5432, "process": "postgres"}]}
+{"type": "phase", "phase": "model", "description": "Synthesizing answer..."}
+{"type": "message", "delta": "Port 5432 is currently occupied by PostgreSQL (PID 12345)."}
+{"type": "phase", "phase": "done"}
+```
+
+---
+
+## Natural Language Topology Filtering
+
+Arbiter includes a specialized intelligence endpoint `POST /api/v1/intelligence/filter`. It translates natural-language queries (e.g., *"show all postgres containers listening on 5432"*) into a structured JSON filter plan using `FILTER_LLM_MODEL`.
+
+If the model is unreachable, the system automatically falls back to an offline deterministic token parser.

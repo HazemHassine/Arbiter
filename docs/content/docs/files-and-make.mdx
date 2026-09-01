@@ -1,0 +1,71 @@
+---
+title: Config Editor, Make & Dockerfile Intelligence
+description: Safe configuration editing, SHA-256 validation, backup/undo pipeline, Makefile target runner, and Dockerfile diagnostics.
+---
+
+# Config Editor, Make & Dockerfile Intelligence
+
+Arbiter provides targeted tools for inspecting and safely modifying local repository configuration files without exposing generic, unbounded filesystem read/write access.
+
+---
+
+## Scoped Configuration File Editor
+
+The Arbiter file editor is strictly restricted to recognized configuration files located inside explicitly registered project boundaries.
+
+### Supported Configuration Files
+- Environment definitions: `.env`, `.env.local`, `.env.development`, `.env.example`, `.env.template`, `.env.dist`
+- Docker Compose definitions: `compose.yaml`, `compose.yml`, `docker-compose.yaml`, `docker-compose.yml`, `compose.override.yaml`
+- Build files: `Makefile`, `Dockerfile`, `Dockerfile.*`
+
+### Safety & Concurrency Guarantees
+
+1. **Path Traversal Protection**: Paths containing `..` or pointing outside registered project directories are rejected immediately.
+2. **Optimistic Concurrency Control (SHA-256 Pre-Check)**: To avoid overwriting concurrent edits, save requests require an `expected_sha256` hash of the file. If the file on disk has changed since it was loaded in the editor, the save is aborted with a conflict error.
+3. **Automatic Timestamped Backups**: Before applying any edit, Arbiter writes an exact copy to `<filename>.bak.<timestamp>`.
+4. **One-Click Undo API**: Operators can roll back the latest managed edit at any time via `POST /api/v1/projects/{id}/files/undo`.
+
+```bash
+# Preview file edit diff with secret masking
+curl -X POST http://127.0.0.1:8765/api/v1/projects/my-project/files/preview \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "path": "compose.yaml",
+    "content": "services:\n  web:\n    ports:\n      - \"3001:80\"\n",
+    "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }'
+```
+
+---
+
+## Makefile Intelligence & Target Runner
+
+Arbiter parses project Makefiles using static AST extraction rather than executing arbitrary shell targets:
+
+- **Target Discovery**: Lists all declared targets, comments, and prerequisite dependencies.
+- **Risk Inference**: Evaluates target commands to assign safety risk tiers (e.g. `make test` vs `make clean` vs `make deploy`).
+- **Target Execution**: Running Make targets generates typed `ActionSpec` proposals with execution timeouts and captured output logs.
+
+```bash
+# List Make targets for a project via REST
+curl http://127.0.0.1:8765/api/v1/projects/my-project/make/targets
+
+# Inspect a specific target
+curl http://127.0.0.1:8765/api/v1/projects/my-project/make/targets/build
+```
+
+---
+
+## Dockerfile Heuristic Inspection
+
+Arbiter inspects Dockerfiles in registered projects to provide instant static diagnostics:
+
+- **Base Images (`FROM`)**: Detects base image repositories, tags, and multi-stage build stages.
+- **Exposed Ports (`EXPOSE`)**: Identifies declared container listening ports to cross-reference with Compose port mappings.
+- **Entrypoints & Commands (`ENTRYPOINT`, `CMD`)**: Parses executable commands and default arguments.
+- **Potential Issues**: Flags missing expose declarations or outdated base image tags.
+
+```bash
+# Inspect project Dockerfiles
+curl http://127.0.0.1:8765/api/v1/projects/my-project/dockerfiles
+```

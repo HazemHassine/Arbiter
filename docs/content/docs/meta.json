@@ -2,10 +2,26 @@
   "title": "Documentation",
   "pages": [
     "index",
+    "---Concepts---",
     "architecture",
+    "safety-and-verification",
+    "topology",
+    "---Features---",
+    "stacks",
     "config-secrets-intelligence",
-    "configuration",
+    "docker-and-compose",
+    "files-and-make",
+    "---Interfaces---",
+    "ui",
     "cli",
-    "ui"
+    "tui",
+    "---Protocols & Integrations---",
+    "mcp",
+    "a2a",
+    "agent-runtime",
+    "---Reference---",
+    "configuration",
+    "api",
+    "development"
   ]
 }

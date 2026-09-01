@@ -1,0 +1,74 @@
+---
+title: Docker & Compose Orchestration
+description: Container lifecycle, Compose port editing, logs, metrics, volumes, and disk usage safety.
+---
+
+# Docker & Compose Orchestration
+
+Arbiter provides a typed, safety-first control layer over the local Docker daemon and Docker Compose projects. Rather than issuing unvalidated `docker` shell commands, Arbiter uses typed Docker SDK calls and structured Compose file editors with automatic syntax validation and rollback guarantees.
+
+---
+
+## Container Lifecycle & Observability
+
+### 1. Enriched Container Inspection
+Arbiter automatically correlates low-level Docker containers with high-level workspace metadata:
+
+- **Compose Metadata**: Inferred project name (`com.docker.compose.project`), service name (`com.docker.compose.service`), and working directory.
+- **Port Forwards**: Maps published container ports (`0.0.0.0:8080->80/tcp`) to host listeners and verified process owners.
+- **Health Checks**: Real-time status (`healthy`, `unhealthy`, `starting`, `none`).
+
+### 2. On-Demand Container Logs & Metrics
+To minimize system overhead, Arbiter streams container logs and resource metrics strictly **on demand**:
+
+- **Logs Tailing**: Fetch bounded recent logs with configurable tail depth (default 200 lines). Logs are never permanently stored by Arbiter.
+- **One-Shot Metrics**: Query live CPU percentage, memory usage, memory limit, and network I/O stats for any container.
+
+```bash
+# View recent logs from CLI
+arbiter logs web-service-1 --tail 100
+
+# Query container stats via REST
+curl http://127.0.0.1:8765/api/v1/containers/web-service-1/stats
+```
+
+---
+
+## Compose Service Port Remapping
+
+When port collisions occur between local services, Arbiter can safely rewrite Compose port bindings:
+
+```text
+┌────────────────────────────────────────────────────────┐
+│ 1. Backup original compose.yaml / .env                 │
+├────────────────────────────────────────────────────────┤
+│ 2. Rewrite host port binding in YAML/env               │
+├────────────────────────────────────────────────────────┤
+│ 3. Validate Compose file syntax with `compose config`  │
+├────────────────────────────────────────────────────────┤
+│ 4. Recreate only the affected service container        │
+├────────────────────────────────────────────────────────┤
+│ 5. Verify new host port has listener socket            │
+│    (If step 3, 4, or 5 fails: restore backup)          │
+└────────────────────────────────────────────────────────┘
+```
+
+### Safety & Compensation
+If service recreation fails or the new port fails post-action verification, Arbiter immediately restores the timestamped backup (`.bak.<timestamp>`) and raises an error, ensuring your repository is never left in a broken state.
+
+---
+
+## Docker Resources & Disk Usage
+
+### 1. Disk Usage Analytics
+Monitor local Docker resource consumption:
+
+```bash
+arbiter disk
+```
+
+Returns total size, active count, and reclaimable space across images, containers, local volumes, and build cache.
+
+### 2. Volume & Image Safety Policies
+- **Image Removal (`image.remove`)**: Classified as `HIGH_RISK`. Requires explicit approval.
+- **Volume Removal (`volume.remove`)**: Classified as `DESTRUCTIVE`. Permanent data deletion is never auto-approved under any configuration.

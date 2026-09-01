@@ -5,61 +5,77 @@ description: Arbiter local development control plane documentation
 
 # Arbiter
 
-A local-first Linux control plane for understanding and safely operating projects, Docker/Compose resources, host processes, ports, files, and development servers. It follows an explicit observe → diagnose → propose → approve → act → verify workflow and binds its API to `127.0.0.1` by default.
+**Arbiter** is a local-first Linux control plane for understanding, diagnosing, and safely operating local development projects, Docker/Compose resources, host processes, ports, files, and multi-service environments.
+
+It strictly adheres to an **observe → diagnose → propose → approve → act → verify** workflow and binds its REST API to `127.0.0.1` by default.
+
+---
 
 ## Quick Start
 
 ```bash
+# 1. Setup environment and install dependencies
 cp .env.example .env
-uv sync --extra dev
+uv sync --all-extras
+
+# 2. Start the Arbiter daemon
 uv run arbiter serve
+
+# 3. Verify health and port listeners
 curl http://127.0.0.1:8765/health
 curl http://127.0.0.1:8765/api/v1/ports
 ```
 
-Open [http://127.0.0.1:8765](http://127.0.0.1:8765) for the web control panel. It uses a compact product-console interface with a global live-resource picker, an interactive topology canvas, workspace screens, process evidence, and an observability console for SSE events, auto-refreshing container logs and metrics, and embedded localhost previews.
-
-The Admin page adds rolling API latency, LLM usage, event pipeline, process/database, agent-harness, and safety-policy views alongside an operational handbook.
+Open [http://127.0.0.1:8765](http://127.0.0.1:8765) to access the **Web Control Panel**.
 
 ---
 
-## Terminal-First & Shell Ergonomics
+## Interfaces & Integrations
 
-For engineers who want to stay in the terminal without opening a browser:
+Arbiter provides consistent, safety-backed operational capabilities across multiple interfaces:
 
-- **Interactive TUI Mode (`arbiter tui`)**: A fast, keyboard-driven Terminal UI (like lazydocker / k9s) letting you navigate ports, containers, approvals, projects, and logs with vim keybindings (`j`/`k`/`Enter`/`Tab`/`1..5`/`a`/`l`).
-- **Interactive CLI Pickers with Fuzzy Search**: Commands like `arbiter prepare`, `arbiter inspect`, `arbiter logs`, or `arbiter approve` without arguments open an interactive fuzzy selector (`fzf`-style) over registered projects, active ports, containers, and approvals with a live preview pane.
-- **Shell Prompt / Starship Integration**: `arbiter prompt` hook to display status pills in your `zsh`/`bash`/`fish` prompt or Starship prompt (e.g., `⚡ Arbiter: 1 pending approval | 0 conflicts`).
-
-For full details, see the [CLI & Terminal Ergonomics Documentation](/docs/cli).
+| Interface / Protocol | Command / Entrypoint | Description |
+| :--- | :--- | :--- |
+| **Web Control Panel** | `http://127.0.0.1:8765` | Interactive topology canvas, observability, container logs/metrics, approvals, and admin. |
+| **Terminal UI (TUI)** | `arbiter tui` | Fast, keyboard-driven terminal dashboard (like lazydocker/k9s) with vim navigation. |
+| **CLI & Fuzzy Pickers** | `arbiter <command>` | `fzf`-style interactive selectors for projects, ports, containers, and approvals. |
+| **Shell Prompt Hook** | `arbiter prompt` | Status pills in `zsh`, `bash`, `fish`, or Starship prompts. |
+| **Model Context Protocol** | `arbiter mcp` | Native stdio MCP server for Claude Desktop, Cursor, Zed, and Antigravity. |
+| **Agent-to-Agent (A2A)** | `/.well-known/agent-card.json` | Inter-agent discovery and task delegation protocol. |
+| **REST & Event APIs** | `/api/v1/*` | Standard REST endpoints, SSE activity stream, and NDJSON streaming agent query. |
 
 ---
 
-## What it observes
+## Core Capabilities
 
-- A fresh topology graph links projects, Compose files/services, containers, images, volumes, networks, ports, host processes, Dockerfiles, and Make targets.
-- The topology canvas supports zoom and fit controls, connected-path focus, project scoping, local search, and strict natural-language resource filtering.
-- Runtime-driven discovery creates ephemeral workspace evidence from Compose labels and process working directories; explicit registration remains required before a project can be edited.
-- Docker event streaming plus configurable host polling drive the SSE activity feed at `/api/v1/events/stream`.
-- The observability workspace can tail a selected container, filter or pause output, inspect a runtime metrics snapshot, and render likely HTTP listeners in an embedded preview with a new-tab fallback. Logs and metrics remain on demand and are never persisted by the control plane.
-- Dockerfile and Makefile inspection provide deterministic metadata and conservative diagnostics; the LLM layer only sits above typed read-only tools.
-- Smart Config & Secrets Intelligence audits `.env` vs `compose.yaml` and `.env.example` to detect port drift, missing variables, and unconfigured placeholders with credential masking and dry-run visual diffs.
-- Multi-project stack presets group repositories into operational environments (e.g. *Billing Microservices*, *AI Pipeline + Vector DB*, *Frontend App + Mock API*) with 1-click context switching, dynamic `.env` port binding, and dependency readiness gates (TCP sockets, HTTP endpoints, Docker health).
-- Optional resource-query interpretation uses `FILTER_LLM_MODEL` (default `gpt-5.4-nano`) to produce a strict typed filter plan. Matching is still local and deterministic, and automatically falls back to the built-in parser.
+- **Live Machine Topology**: Real-time relational graph linking projects, Compose files/services, containers, images, volumes, networks, ports, host processes, Dockerfiles, and Make targets.
+- **Port Conflict Reconciliation**: Deterministic port collision detection and automatic free-port reassignment across `.env` and `compose.yaml` with backup and rollback.
+- **Multi-Project Stacks**: Named environment profiles with 1-click context switching, topological DAG boot ordering (Kahn's algorithm), and multi-probe readiness gates (`tcp_port`, `http_get`, `docker_health`).
+- **Config & Secrets Intelligence**: Proactive detection of port drift and missing `.env` variables compared to `.env.example`, with zero raw secret exposure and time-travel visual diffs.
+- **Safety Engine**: 5-tier risk classification (`READ_ONLY` to `DESTRUCTIVE`), immutable serialized approval payloads, and independent post-action verification.
 
-## Register and prepare a project
+---
 
-```bash
-uv run arbiter register /home/user/dev/github-analysis
-uv run arbiter prepare github-analysis
-uv run arbiter approve APPROVAL_ID
-```
+## Documentation Navigation
 
-The preparation operation inspects Compose configuration and real listening ports. Conflicting host ports produce deterministic alternatives and a persisted approval. Approval executes exactly the stored arguments, backs up configuration, validates it, recreates only affected services, and records post-action checks.
-
-## Switch multi-project stack presets
-
-```bash
-# Switch to a complete operational stack with zero port collisions and readiness verification
-uv run arbiter stack switch "AI Pipeline + Vector DB"
-```
+- **Concepts**:
+  - [Architecture & Safety](/docs/architecture) — System domains and design principles.
+  - [Safety & Verification](/docs/safety-and-verification) — Risk tiers, approval engine, and rollback compensations.
+  - [Topology Graph](/docs/topology) — Real-time machine graph and correlation engine.
+- **Features**:
+  - [Multi-Project Stacks](/docs/stacks) — Stacks, DAG boot plans, and readiness gates.
+  - [Config & Secrets Intelligence](/docs/config-secrets-intelligence) — Port drift and credential audits.
+  - [Docker & Compose](/docs/docker-and-compose) — Container lifecycles, logs, stats, and port editing.
+  - [Config Editor & Make](/docs/files-and-make) — Safe file editing, Make targets, and Dockerfile diagnostics.
+- **Interfaces**:
+  - [Web Control Panel](/docs/ui) — Browser console walkthrough and observability tools.
+  - [CLI & Shell Ergonomics](/docs/cli) — CLI commands, pickers, and Starship prompt setup.
+  - [Terminal UI (TUI)](/docs/tui) — Full-screen terminal dashboard and keybindings.
+- **Protocols & Integrations**:
+  - [Model Context Protocol (MCP)](/docs/mcp) — Connecting Claude, Cursor, and Zed via stdio MCP.
+  - [Agent-to-Agent (A2A)](/docs/a2a) — Agent Card specification and task delegation.
+  - [AI Agent & Tool Runtime](/docs/agent-runtime) — LangGraph agent, tool loop, and NDJSON streaming.
+- **Reference & Development**:
+  - [Configuration Reference](/docs/configuration) — Complete `.env` settings table.
+  - [REST API Reference](/docs/api) — Exhaustive REST endpoints and SSE/NDJSON reference.
+  - [Development Guide](/docs/development) — Contributing, testing (`pytest`/`hypothesis`), and building.

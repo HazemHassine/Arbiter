@@ -1,0 +1,265 @@
+---
+title: Model Context Protocol (MCP)
+description: Connect Arbiter as an MCP server to Claude Desktop, Cursor, Zed, Antigravity, and other AI clients.
+---
+
+# Model Context Protocol (MCP) Integration
+
+Arbiter implements a native [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) stdio server. This exposes Arbiter's local-first observation, topology, port reconciliation, Docker diagnostics, and multi-project stack readiness inspection directly to AI assistants like **Claude Desktop**, **Cursor**, **Zed**, and **Antigravity**.
+
+```text
+┌────────────────────────────────────────────────────────┐
+│     AI Clients (Claude Desktop / Cursor / Zed)         │
+└───────────────────────────┬────────────────────────────┘
+                            │ stdio (JSON-RPC)
+┌───────────────────────────▼────────────────────────────┐
+│                  arbiter mcp adapter                   │
+├────────────────────────────────────────────────────────┤
+│           Shared Arbiter Domain Services               │
+│  (Ports, Topology, Projects, Docker, Stacks, Safety)   │
+└────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Prerequisites & Installation
+
+The MCP adapter is an optional extra to keep core Arbiter minimal. Install Arbiter with the `mcp` extra:
+
+```bash
+# Using uv (recommended)
+uv sync --extra mcp
+
+# Or if installing via pip
+pip install "arbiter[mcp]"
+```
+
+Verify that the CLI command is available:
+
+```bash
+uv run arbiter mcp --help
+```
+
+---
+
+## Starting the Server
+
+The server communicates over standard input/output (`stdio`) using the MCP JSON-RPC protocol:
+
+```bash
+# Start the stdio MCP server
+uv run arbiter mcp
+```
+
+When invoked by an MCP client, the adapter automatically bootstraps the shared Arbiter service container, connects to the local SQLite database (`DATABASE_URL`), and dynamically queries `/proc`, Linux `ss`, and Docker without running any separate web daemon.
+
+---
+
+## Client Configuration
+
+### 1. Claude Desktop
+
+Add the Arbiter MCP server to your Claude Desktop configuration file:
+
+- **Linux**: `~/.config/Claude/claude_desktop_config.json`
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "arbiter": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/absolute/path/to/dev-environment-agent",
+        "run",
+        "arbiter",
+        "mcp"
+      ],
+      "env": {
+        "PROJECT_ROOTS": "/home/user/dev",
+        "DEFAULT_PORT_SEARCH_RANGE_START": "3000",
+        "DEFAULT_PORT_SEARCH_RANGE_END": "9999"
+      }
+    }
+  }
+}
+```
+
+---
+
+### 2. Cursor IDE
+
+In Cursor, add Arbiter under **Settings → Features → MCP**:
+
+- **Name**: `arbiter`
+- **Type**: `command`
+- **Command**: `uv --directory /path/to/dev-environment-agent run arbiter mcp`
+
+Or configure `.cursor/mcp.json` in your workspace:
+
+```json
+{
+  "mcpServers": {
+    "arbiter": {
+      "command": "uv",
+      "args": ["run", "arbiter", "mcp"]
+    }
+  }
+}
+```
+
+---
+
+### 3. Zed Editor
+
+Add the server to your Zed configuration (`~/.config/zed/settings.json`):
+
+```json
+{
+  "experimental": {
+    "model_context_protocol": {
+      "arbiter": {
+        "command": "uv",
+        "args": [
+          "--directory",
+          "/path/to/dev-environment-agent",
+          "run",
+          "arbiter",
+          "mcp"
+        ]
+      }
+    }
+  }
+}
+```
+
+---
+
+## Complete MCP Tool Catalog
+
+The Arbiter MCP adapter exposes **13 typed tools** spanning ports, containers, projects, topology, and stack readiness. All tools operate within strict read-only observation or propose-only safety semantics.
+
+### Port Management Tools
+
+#### `ports_list`
+Lists all active TCP listening ports, correlated with host processes (PIDs, binary names, command lines) and Docker container/Compose service bindings.
+- **Arguments**: None
+- **Returns**: Array of port listener objects:
+  ```json
+  [
+    {
+      "port": 5432,
+      "protocol": "tcp",
+      "bind_address": "0.0.0.0",
+      "pid": 12345,
+      "process_name": "postgres",
+      "cmdline": "postgres -D /var/lib/postgresql/data",
+      "docker_container_id": "a1b2c3d4",
+      "docker_container_name": "db-postgres-1",
+      "compose_project": "backend",
+      "compose_service": "db"
+    }
+  ]
+  ```
+
+#### `ports_find_owner`
+Identifies the process or Docker container currently bound to a specific host port.
+- **Arguments**:
+  - `port` (`integer`, required): The port number to inspect (e.g. `5432`).
+- **Returns**: Port owner object if bound, or `{"port": 5432, "available": true}` if free.
+
+#### `ports_find_free`
+Finds a deterministic, unbound host port at or above the specified preferred port.
+- **Arguments**:
+  - `preferred_port` (`integer`, required): Starting port preference (e.g. `3000`).
+- **Returns**: Integer port number guaranteed to be unbound on loopback and 0.0.0.0 (e.g. `3001`).
+
+#### `ports_detect_conflicts`
+Scans all registered projects, Compose definitions, and active runtime sockets to detect duplicate port claims and active collisions.
+- **Arguments**: None
+- **Returns**: Array of conflict objects containing colliding services, port numbers, and owner details.
+
+---
+
+### Project & Reconciliation Tools
+
+#### `projects_list`
+Lists all explicitly registered development projects along with their detected Compose files, services, Dockerfiles, and declared ports.
+- **Arguments**: None
+- **Returns**: Array of project summaries including ID, name, path, compose files, and declared ports.
+
+#### `arbiter_prepare_project`
+Performs an end-to-end inspection of a project, diagnoses collisions, proposes deterministic port reassignments, and generates a persisted safety approval.
+- **Arguments**:
+  - `identifier` (`string`, required): Project name or UUID (e.g. `"billing-service"`).
+- **Returns**: Summary of detected conflicts, proposed `.env`/`compose.yaml` changes, and the resulting `approval_id`.
+
+#### `project_reconciliation_plan`
+Generates a deterministic, read-only dry-run plan showing exactly which port bindings or `.env` variables would be remapped to resolve conflicts without applying any mutations.
+- **Arguments**:
+  - `identifier` (`string`, required): Project name or UUID.
+- **Returns**: Structured reconciliation plan with current vs. suggested port mappings and affected services.
+
+---
+
+### Docker & Host Process Tools
+
+#### `docker_list_containers`
+Lists all local Docker containers enriched with Compose metadata, health status, published ports, image tags, and uptime.
+- **Arguments**: None
+- **Returns**: Array of container models with state, compose project/service labels, and port forwards.
+
+#### `processes_list`
+Lists host processes with listening port evidence, working directories, and project correlation.
+- **Arguments**: None
+- **Returns**: Array of process objects with PID, process name, command line, listening ports, and detected project path.
+
+---
+
+### Topology & Machine Graph Tools
+
+#### `topology_get`
+Retrieves the complete, freshly evaluated workstation topology graph linking projects, services, containers, networks, volumes, ports, Dockerfiles, and Make targets.
+- **Arguments**: None
+- **Returns**: Typed graph object with nodes and directional edges representing system relationships.
+
+#### `resource_inspect`
+Inspects a specific topology resource and returns all directly connected upstream and downstream resources.
+- **Arguments**:
+  - `resource_type` (`string`, required): One of `"project"`, `"container"`, `"port"`, `"process"`, `"service"`, `"image"`, `"volume"`, `"network"`, `"dockerfile"`, `"make_target"`.
+  - `resource_id` (`string`, required): Unique identifier or path of the target resource.
+- **Returns**: Detailed node attributes and linked neighbors.
+
+---
+
+### Multi-Project Stacks & Readiness Tools
+
+#### `stack_readiness_check`
+Probes all readiness gates (TCP sockets, HTTP endpoints, Docker container health) for a multi-project stack preset under Arbiter's strict destination safety policy.
+- **Arguments**:
+  - `identifier` (`string`, required): Stack preset name or UUID (e.g. `"Billing Microservices"`).
+- **Returns**: Array of probe results with gate status (`allowed`, `approval_required`, `blocked`), probe type, target URL/port, and measured latency in milliseconds.
+
+#### `stack_readiness_request_access`
+Creates pending safety approvals for any non-local or external network destinations defined in a stack's readiness gates.
+- **Arguments**:
+  - `identifier` (`string`, required): Stack preset name or UUID.
+- **Returns**: Array of created approval objects scoped to protocol, host, port, and resolved IP addresses.
+
+#### `readiness_authorizations_list`
+Lists all currently active, persisted operator grants for external readiness probes.
+- **Arguments**: None
+- **Returns**: Array of authorized grants with target key, protocol, host, port, and creation timestamp.
+
+---
+
+## Safety & Security Guarantees in MCP
+
+When AI models interact with Arbiter via MCP:
+
+1. **Read-Only by Default**: Inspection tools (`ports_list`, `topology_get`, `docker_list_containers`, etc.) execute immediately without mutating any files or containers.
+2. **Propose-Only for Mutations**: Any operation that changes state (such as `arbiter_prepare_project` or `stack_readiness_request_access`) does not mutate files directly; it creates an **immutable approval record** in the SQLite database.
+3. **Operator Verification**: The developer must review the proposed visual diff and explicitly approve the change via the CLI (`arbiter approve <ID>`), TUI (`a` key), or Web UI (`http://127.0.0.1:8765/#approvals`).
+4. **Credential Redaction**: Environment variables containing sensitive keywords (`PASSWORD`, `TOKEN`, `KEY`, `SECRET`) are masked automatically before being returned over MCP.

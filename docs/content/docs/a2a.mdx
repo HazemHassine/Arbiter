@@ -1,0 +1,140 @@
+---
+title: Agent-to-Agent (A2A) Protocol
+description: Agent Card specification and inter-agent task execution protocol.
+---
+
+# Agent-to-Agent (A2A) Protocol
+
+Arbiter implements standard **Agent-to-Agent (A2A)** interoperability, allowing autonomous coding agents, orchestration frameworks, and peer AI systems to discover Arbiter's capabilities and delegate environment management tasks through a standardized contract.
+
+---
+
+## The Agent Card (`/.well-known/agent-card.json`)
+
+Arbiter serves a machine-readable **Agent Card** at `/.well-known/agent-card.json`. This endpoint describes the agent's identity, capabilities, supported skills, and task delegation endpoints.
+
+### Agent Card JSON Schema
+
+```json
+{
+  "name": "Arbiter",
+  "description": "Understands, diagnoses, and safely reconciles local Linux development environments.",
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false
+  },
+  "skills": [
+    {
+      "id": "prepare_project",
+      "name": "Prepare local project"
+    },
+    {
+      "id": "resolve_port_conflicts",
+      "name": "Resolve port conflicts"
+    },
+    {
+      "id": "diagnose_project",
+      "name": "Diagnose local environment"
+    },
+    {
+      "id": "inspect_docker",
+      "name": "Inspect Docker state"
+    },
+    {
+      "id": "check_stack_readiness",
+      "name": "Check policy-controlled stack readiness"
+    }
+  ],
+  "taskEndpoint": "/api/v1/projects/{id}/prepare"
+}
+```
+
+---
+
+## Supported A2A Skills
+
+When another agent delegates a task to Arbiter, it references one of the following skill identifiers:
+
+### 1. `prepare_project`
+- **Objective**: Inspect a project, audit its Compose and `.env` files against live host ports, resolve collisions to deterministic free ports, and stage safety approvals.
+- **Underlying Action**: `agent.prepare_project(identifier=project)`
+- **Safety Policy**: Creates a pending safety approval with time-travel diffs before applying any file modifications.
+
+### 2. `resolve_port_conflicts`
+- **Objective**: Identify port collisions for a registered project and compute deterministic port reassignment plans.
+- **Underlying Action**: `agent.prepare_project(identifier=project, resolve_port_conflicts=True)`
+
+### 3. `diagnose_project`
+- **Objective**: Analyze Compose services, container health, missing environment variables, and listening sockets.
+- **Underlying Action**: `agent.diagnose_project(identifier=project)`
+- **Safety Policy**: Read-only diagnostic report; no approval required.
+
+### 4. `inspect_docker`
+- **Objective**: Query running containers, images, volumes, and networks associated with the project workspace.
+- **Underlying Action**: `services.docker.list_containers()`
+
+### 5. `check_stack_readiness`
+- **Objective**: Evaluate health check gates (TCP sockets, HTTP endpoints, container health) for a multi-project stack preset subject to destination safety policies.
+- **Underlying Action**: `services.stacks.check_stack_readiness(identifier=project)`
+
+---
+
+## Task Delegation Flow
+
+When an external orchestrator (e.g. LangGraph supervisor, AutoGen, CrewAI, or another Antigravity instance) interacts with Arbiter:
+
+```text
+┌────────────────────────┐                   ┌────────────────────────┐
+│  Orchestrator Agent    │                   │    Arbiter Instance    │
+└───────────┬────────────┘                   └───────────┬────────────┘
+            │                                            │
+            │  1. Discover capabilities                  │
+            │  GET /.well-known/agent-card.json          │
+            ├───────────────────────────────────────────►│
+            │  2. Return declared skills & task endpoints│
+            │◄───────────────────────────────────────────┤
+            │                                            │
+            │  3. Delegate task (e.g. "prepare_project") │
+            │  POST /api/v1/projects/billing-app/prepare │
+            ├───────────────────────────────────────────►│
+            │                                            │
+            │  4. Return diagnosis & Approval ID         │
+            │◄───────────────────────────────────────────┤
+            │                                            │
+            │  5. Operator approves via CLI/TUI/UI       │
+            │  POST /api/v1/approvals/{id}/approve       │
+            │───────────────────────────────────────────►│
+```
+
+---
+
+## Inter-Agent Integration Example (Python)
+
+An orchestrator can easily interact with Arbiter using standard HTTP requests:
+
+```python
+import httpx
+
+ARBITER_URL = "http://127.0.0.1:8765"
+
+# 1. Fetch Agent Card
+client = httpx.Client(base_url=ARBITER_URL)
+card = client.get("/.well-known/agent-card.json").json()
+print(f"Connected to agent: {card['name']}")
+
+# 2. Delegate project preparation
+response = client.post(
+    "/api/v1/projects/my-service/prepare",
+    json={
+        "resolve_port_conflicts": True,
+        "start": True,
+        "verify": True,
+    },
+)
+result = response.json()
+
+if result.get("status") == "approval_required":
+    approval_id = result["approval"]["id"]
+    print(f"Safety approval created: {approval_id}")
+    print(f"Proposed actions: {result['approval']['summary']}")
+```

@@ -1,0 +1,118 @@
+---
+title: Development & Contributing Guide
+description: Development workflow, testing with pytest and hypothesis, building the UI, and docs guide.
+---
+
+# Development & Contributing Guide
+
+This guide covers setting up a local development environment for contributing to Arbiter, running test suites, and building the web UI and documentation site.
+
+---
+
+## Prerequisites
+
+- **Operating System**: Linux (Ubuntu 22.04+, Debian 12+, Arch, Fedora, etc.)
+- **Python**: Version 3.12 or newer
+- **Package Manager**: [uv](https://docs.astral.sh/uv/) (Astral's fast Python package manager)
+- **Node.js**: Version 20.19+ (required only when building the Web UI or Documentation)
+- **Docker**: Version 24+ with Compose v2 (optional for core unit tests; required for container inspection)
+
+---
+
+## Local Setup
+
+```bash
+# 1. Clone repository
+git clone https://github.com/HazemHassine/Arbiter.git
+cd Arbiter
+
+# 2. Synchronize Python environment with all extras
+uv sync --all-extras
+
+# 3. Create local configuration file
+cp .env.example .env
+
+# 4. Start local development server
+uv run arbiter serve
+```
+
+---
+
+## Running Test Suites
+
+Arbiter maintains an extensive automated test suite covering unit tests, property-based testing, and API integration tests:
+
+### 1. Fast Unit & API Tests
+```bash
+# Run all unit tests
+uv run pytest
+
+# Run specific API test suite
+uv run pytest tests/api/
+
+# Run CLI ergonomics tests
+uv run pytest tests/cli/
+```
+
+### 2. Property-Based Testing (`hypothesis`)
+Arbiter uses [Hypothesis](https://hypothesis.readthedocs.io/) to verify port allocation and conflict resolution algorithms under arbitrary inputs:
+
+```bash
+uv run pytest tests/test_port_allocator_properties.py
+```
+
+### 3. Live Docker Integration Tests
+```bash
+# Runs against local Docker daemon
+uv run pytest tests/test_docker_live.py
+```
+
+---
+
+## Code Quality & Linting
+
+Arbiter uses [Ruff](https://docs.astral.sh/ruff/) for high-speed linting and code formatting:
+
+```bash
+# Check for lint violations
+uv run ruff check .
+
+# Automatically fix lint issues and format code
+uv run ruff check --fix .
+uv run ruff format .
+```
+
+---
+
+## Building the Web Control Panel (`ui/`)
+
+The web control panel is built using Next.js and exported statically so that FastAPI can serve it directly from `src/arbiter/ui/out` without requiring a Node.js runtime in production.
+
+```bash
+# Install UI dependencies
+cd ui
+npm install
+
+# Start local UI dev server with hot reload (proxies to FastAPI on 8765)
+npm run dev
+
+# Build and export static bundle for FastAPI
+npm run build
+```
+
+---
+
+## Building Documentation (`docs/`)
+
+The documentation site is built with Fumadocs and Next.js:
+
+```bash
+# Run docs development server
+npm --prefix docs run dev
+
+# Typecheck and validate docs MDX routes
+npm --prefix docs run types:check
+
+# Production build of docs site
+npm --prefix docs run build
+```
