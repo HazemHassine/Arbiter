@@ -11,7 +11,7 @@ import { notFound } from 'next/navigation';
 import { getMDXComponents } from '@/components/mdx';
 import type { Metadata } from 'next';
 import { createRelativeLink } from 'fumadocs-ui/mdx';
-import { gitConfig } from '@/lib/shared';
+import { gitConfig, siteUrl } from '@/lib/shared';
 
 export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
   const params = await props.params;
@@ -29,7 +29,7 @@ export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
         <MarkdownCopyButton markdownUrl={markdownUrl} />
         <ViewOptionsPopover
           markdownUrl={markdownUrl}
-          githubUrl={`https://github.com/${gitConfig.user}/${gitConfig.repo}/blob/${gitConfig.branch}/content/docs/${page.path}`}
+          githubUrl={`https://github.com/${gitConfig.user}/${gitConfig.repo}/blob/${gitConfig.branch}/docs/content/docs/${page.path}`}
         />
       </div>
       <DocsBody>
@@ -53,11 +53,35 @@ export async function generateMetadata(props: PageProps<'/docs/[[...slug]]'>): P
   const page = source.getPage(params.slug);
   if (!page) notFound();
 
+  const imageUrl = getPageImageUrl(page).url;
+  const pageUrl = page.url;
+
   return {
     title: page.data.title,
     description: page.data.description,
+    alternates: {
+      canonical: pageUrl,
+    },
     openGraph: {
-      images: getPageImageUrl(page).url,
+      title: `${page.data.title} | Arbiter Documentation`,
+      description: page.data.description,
+      url: pageUrl,
+      type: 'article',
+      siteName: 'Arbiter Documentation',
+      images: [
+        {
+          url: imageUrl,
+          width: 1200,
+          height: 630,
+          alt: `${page.data.title} - Arbiter Documentation`,
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${page.data.title} | Arbiter Documentation`,
+      description: page.data.description,
+      images: [imageUrl],
     },
   };
 }

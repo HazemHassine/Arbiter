@@ -1,4 +1,11 @@
 import Link from 'next/link';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Arbiter - Local Development Control Plane',
+  description:
+    'Understand conflicts. Reconcile them safely. Arbiter connects Docker containers, host processes, ports, and configuration into an evidence-backed workflow.',
+};
 
 export default function HomePage() {
   return (
